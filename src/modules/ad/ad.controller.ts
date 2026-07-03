@@ -66,13 +66,25 @@ export const getAds = asyncHandler(async (req: Request, res: Response) => {
 
 export const getAd = asyncHandler(async (req: Request, res: Response) => {
     const user = req.user as JwtPayload | undefined;
-    const { increment } = req.query;
-    const ad = await adService.getAdByIdAggregated(req.params.id as string, user?.id, increment === 'true');
+    const ad = await adService.getAdByIdAggregated(req.params.id as string, user?.id);
     if (!ad) {
         return res.status(404).json(formatResponse(false, 'Ad not found'));
     }
 
     res.status(200).json(formatResponse(true, 'Ad fetched successfully', ad));
+});
+
+export const countAdView = asyncHandler(async (req: Request, res: Response) => {
+    const id = req.params.id as string;
+
+    const ip = req.ip || (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.socket.remoteAddress || 'unknown';
+
+    const result = await adService.countAdView(id, ip);
+    if (!result) {
+        return res.status(404).json(formatResponse(false, 'Ad not found'));
+    }
+
+    res.status(200).json(formatResponse(true, result.counted ? 'View counted' : 'View already counted', result));
 });
 
 export const updateAd = asyncHandler(async (req: Request, res: Response) => {

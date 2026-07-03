@@ -1,5 +1,7 @@
 import { Document, PipelineStage, Types } from 'mongoose';
+import crypto from 'crypto';
 import { AdModel, IAd } from './models/ad.model';
+import { AdViewModel } from './models/ad-view.model';
 import * as mediaService from '../media/media.service';
 import { MediaModel } from '../media/models/media.model';
 import { UserSubscriptionModel } from '../subscription/models/user-subscription.model';
@@ -284,20 +286,58 @@ export const getAdById = async (id: string): Promise<IAd | null> => {
 
     if (!ad) return null;
 
-    // Increment views
-    ad.views = (ad.views || 0) + 1;
-    await AdModel.updateOne({ _id: ad._id }, { $inc: { views: 1 } });
-
     return ad;
+};
+
+export interface CountAdViewResult {
+    counted: boolean;
+    views: number;
+}
+
+/**
+ * Records a single view per ad per IP (hashed, never stored raw) and
+ * atomically increments the ad's view counter only the first time.
+ * Repeat calls from the same IP for the same ad are deduped via the
+ * unique `identifier` index on AdView and simply report the current count.
+ */
+export const countAdView = async (id: string, ip: string): Promise<CountAdViewResult | null> => {
+    let adObjectId: Types.ObjectId;
+    try {
+        adObjectId = await resolveAdId(id, true);
+    } catch {
+        return null;
+    }
+
+    const ad = await AdModel.findById(adObjectId).select('views');
+    if (!ad) return null;
+
+    const identifier = crypto.createHash('sha256').update(`${ip}:${adObjectId.toString()}`).digest('hex');
+
+    const result = await AdViewModel.updateOne(
+        { identifier },
+        { $setOnInsert: { ad: adObjectId, createdAt: new Date() } },
+        { upsert: true },
+    );
+
+    const counted = result.upsertedCount === 1;
+
+    if (!counted) {
+        return { counted: false, views: ad.views ?? 0 };
+    }
+
+    // Atomic increment at the DB level — never read-modify-write.
+    const updated = await AdModel.findByIdAndUpdate(adObjectId, { $inc: { views: 1 } }, { new: true }).select('views');
+
+    return { counted: true, views: updated?.views ?? (ad.views ?? 0) + 1 };
 };
 
 /**
  * Optimized single-aggregation fetch for the ad detail page.
  * Combines: ad fetch, user/propertyType/area/media lookups,
  * office subscription check, and favorite check into ONE pipeline.
- * View increment is done as a non-blocking fire-and-forget.
+ * View counting is handled separately via countAdView.
  */
-export const getAdByIdAggregated = async (id: string, userId?: string, shouldIncrement: boolean = false): Promise<IAd | null> => {
+export const getAdByIdAggregated = async (id: string, userId?: string): Promise<IAd | null> => {
     let adObjectId: Types.ObjectId;
     try {
         adObjectId = await resolveAdId(id, true);
@@ -451,14 +491,6 @@ export const getAdByIdAggregated = async (id: string, userId?: string, shouldInc
     const ad = result.length > 0 ? result[0] : null;
 
     if (!ad) return null;
-
-    // Fire-and-forget view increment (non-blocking)
-    if (shouldIncrement) {
-        ad.views = (ad.views || 0) + 1;
-        AdModel.updateOne({ _id: adObjectId }, { $inc: { views: 1 } })
-            .exec()
-            .catch(() => {});
-    }
 
     return ad;
 };
