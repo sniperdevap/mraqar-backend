@@ -84,7 +84,16 @@ export const countAdView = asyncHandler(async (req: Request, res: Response) => {
         return res.status(404).json(formatResponse(false, 'Ad not found'));
     }
 
-    res.status(200).json(formatResponse(true, result.counted ? 'View counted' : 'View already counted', result));
+    // TEMP DEBUG: remove once the trust-proxy IP resolution is confirmed correct in prod.
+    const debug = {
+        resolvedIp: ip,
+        reqIp: req.ip,
+        reqIps: req.ips,
+        xForwardedFor: req.headers['x-forwarded-for'],
+        socketRemoteAddress: req.socket.remoteAddress
+    };
+
+    res.status(200).json(formatResponse(true, result.counted ? 'View counted' : 'View already counted', { ...result, debug }));
 });
 
 export const updateAd = asyncHandler(async (req: Request, res: Response) => {
