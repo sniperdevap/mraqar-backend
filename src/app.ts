@@ -20,7 +20,8 @@ const app = express();
 
 // Trust proxy setup for getting actual user IP behind a reverse proxy (like Nginx or Heroku)
 // This is important for rate limiting and logging the correct IP address
-app.set('trust proxy', 1);
+// Two hops: Next.js server's Nginx, then the backend's own Nginx, both prepend to X-Forwarded-For
+app.set('trust proxy', 2);
 
 // Middleware setup
 app.use(express.json({ limit: '999mb' }));
