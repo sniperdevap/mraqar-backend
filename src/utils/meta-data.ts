@@ -425,6 +425,14 @@ export const AREAS = [
         governorateAr: 'محافظة العاصمة'
     },
     {
+        _id: '698be3b9ec211e993b6acd1d',
+        label: 'Dasma',
+        labelAr: 'الدسمة',
+        value: 'dasma',
+        governorate: 'Al-Asimah Governorate',
+        governorateAr: 'محافظة العاصمة'
+    },
+    {
         _id: '698be3b96d878b2424e12cd8',
         label: 'Hessa Mubarak Suburb',
         labelAr: 'ضاحية حصة مبارك',
