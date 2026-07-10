@@ -22,19 +22,9 @@ const signup = async (req: Request, res: Response) => {
     password,
     avatar,
     role: UserRole.USER,
-    isVerified: false,
+    isVerified: true,
     isActive: true,
   });
-
-  const otp = await UserService.generateOTP((newUser._id as any).toString());
-  logger.info(`OTP generated for signup: ${phoneNumber}`);
-  const smsSent = await sendSMS(
-    phoneNumber,
-    `هو رقم التفعيل الخاص بك في موقع مستر عقار ${otp}`,
-  );
-  if (!smsSent) {
-    throw new CustomError("Failed to send verification code", 500);
-  }
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { password: _, __v, ...userWithoutSensitiveData } = newUser.toObject();
