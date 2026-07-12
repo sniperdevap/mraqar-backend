@@ -1,49 +1,36 @@
 // requestLogger.ts
-import { Request, Response, NextFunction } from 'express';
-import logger from '../utils/logger';
-import { v4 as uuidv4 } from 'uuid';
+import { Request, Response, NextFunction } from "express";
+import logger from "../utils/logger";
+import { v4 as uuidv4 } from "uuid";
 
 // Extend the Express Request interface to include requestId
 declare global {
-    namespace Express {
-        interface Request {
-            requestId?: string;
-        }
+  namespace Express {
+    interface Request {
+      requestId?: string;
     }
+  }
 }
 
+// ponytail: one line per request; headers/bodies are never logged —
+// stringifying large payloads blocked the event loop for every request.
 const requestLogger = (req: Request, res: Response, next: NextFunction) => {
-    const start = Date.now();
-    const requestId = uuidv4();
-    const { method, url, headers, body } = req;
-    req.requestId = requestId;
+  const start = Date.now();
+  req.requestId = uuidv4();
 
-    const requestLog = {
-        type: 'Request',
-        requestId: requestId,
-        method: method,
-        url: url,
-        headers: headers,
-        body: body
-    };
+  res.on("finish", () => {
+    logger.info(
+      JSON.stringify({
+        requestId: req.requestId,
+        method: req.method,
+        url: req.originalUrl,
+        status: res.statusCode,
+        duration: `${Date.now() - start}ms`,
+      }),
+    );
+  });
 
-    logger.info(JSON.stringify(requestLog));
-
-    // Capture response details after it finishes
-    res.on('finish', () => {
-        const duration = Date.now() - start;
-        const responseLog = {
-            type: 'Response',
-            requestId: requestId,
-            method: method,
-            url: url,
-            status: res.statusCode,
-            duration: `${duration}ms`
-        };
-        logger.info(JSON.stringify(responseLog));
-    });
-
-    next();
+  next();
 };
 
 export default requestLogger;
