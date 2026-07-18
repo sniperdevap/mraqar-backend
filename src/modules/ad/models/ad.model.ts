@@ -81,6 +81,8 @@ const AdSchema: Schema = new Schema(
 AdSchema.index({ status: 1, premiumAd: -1, createdAt: -1 });
 // Covers getMyAds.
 AdSchema.index({ user: 1, createdAt: -1 });
+// Supports active-ad counts and newest-first ads on office pages.
+AdSchema.index({ user: 1, status: 1, createdAt: -1 });
 
 AdSchema.pre("validate", async function () {
   if (this.isNew && !this.publicId) {

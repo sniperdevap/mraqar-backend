@@ -38,92 +38,90 @@ export interface Office {
 /**
  * Get all offices (users with active Office plan subscriptions)
  */
-export const getOffices = async (params: GetOfficesParams = {}): Promise<GetOfficesResult> => {
-    const { page = 1, limit = 12, search } = params;
+export const getOffices = async (
+  params: GetOfficesParams = {},
+): Promise<GetOfficesResult> => {
+  const { page = 1, limit = 12, search } = params;
+  const skip = (page - 1) * limit;
+  const userEligibilityMatch: Record<string, unknown> = {
+    "office.isActive": true,
+    "office.deletedAt": null,
+    "office.isVerified": true,
+    "office.role": { $in: ["user"] },
+  };
 
-    // 1. Find all users with an active OFFICE_PLAN subscription
-    const activeOfficeSubscriptions = await UserSubscriptionModel.find({
-        planType: PlanType.OFFICE_PLAN,
-        deletedAt: null
-    }).select('user');
+  if (search) {
+    userEligibilityMatch.$or = [
+      { "office.name": { $regex: search, $options: "i" } },
+      { "office.phoneNumber": { $regex: search, $options: "i" } },
+    ];
+  }
 
-    const userIds = activeOfficeSubscriptions.map((sub) => sub.user);
-
-    if (userIds.length === 0) {
-        return {
-            offices: [],
-            total: 0,
-            page,
-            totalPages: 0
-        };
-    }
-
-    const skip = (page - 1) * limit;
-    const query: any = {
-        _id: { $in: userIds },
-        isActive: true,
-        deletedAt: null,
-        isVerified: true,
-        role: { $in: ['user'] }
-    };
-
-    if (search) {
-        query.$or = [{ name: { $regex: search, $options: 'i' } }, { phoneNumber: { $regex: search, $options: 'i' } }];
-    }
-
-    const [users, total] = await Promise.all([
-        UserModel.aggregate([
-            { $match: query },
-            { $sort: { createdAt: -1 } },
-            { $skip: skip },
-            { $limit: limit },
-            {
-                $lookup: {
-                    from: 'ads',
-                    let: { userId: '$_id' },
-                    pipeline: [{ $match: { $expr: { $and: [{ $eq: ['$user', '$$userId'] }, { $eq: ['$status', 'active'] }] } } }, { $count: 'count' }],
-                    as: 'adsCountLookup'
-                }
+  const aggregation = await UserSubscriptionModel.aggregate<{
+    offices: Office[];
+    metadata: Array<{ total: number }>;
+  }>([
+    // Preserve the existing office eligibility rule while using the new
+    // planType-leading index instead of materializing every subscription.
+    { $match: { planType: PlanType.OFFICE_PLAN, deletedAt: null } },
+    { $group: { _id: "$user" } },
+    {
+      $lookup: {
+        from: UserModel.collection.name,
+        localField: "_id",
+        foreignField: "_id",
+        as: "office",
+      },
+    },
+    { $unwind: "$office" },
+    { $match: userEligibilityMatch },
+    { $sort: { "office.createdAt": -1 as const } },
+    {
+      $facet: {
+        metadata: [{ $count: "total" }],
+        offices: [
+          { $skip: skip },
+          { $limit: limit },
+          // Count ads only for the paginated offices. The compound
+          // user/status/createdAt index also serves office detail.
+          {
+            $lookup: {
+              from: AdModel.collection.name,
+              localField: "office._id",
+              foreignField: "user",
+              pipeline: [{ $match: { status: "active" } }, { $count: "count" }],
+              as: "adsCountLookup",
             },
-            {
-                $addFields: {
-                    adsCount: { $ifNull: [{ $arrayElemAt: ['$adsCountLookup.count', 0] }, 0] }
-                }
+          },
+          {
+            $project: {
+              _id: "$office._id",
+              name: "$office.name",
+              phoneNumber: "$office.phoneNumber",
+              avatar: "$office.avatar",
+              instagram: "$office.instagram",
+              tiktok: "$office.tiktok",
+              description: "$office.description",
+              adsCount: {
+                $ifNull: [{ $arrayElemAt: ["$adsCountLookup.count", 0] }, 0],
+              },
+              email: "$office.phoneNumber",
             },
-            {
-                $project: {
-                    name: 1,
-                    phoneNumber: 1,
-                    avatar: 1,
-                    instagram: 1,
-                    tiktok: 1,
-                    description: 1,
-                    adsCount: 1
-                }
-            }
-        ]),
-        UserModel.countDocuments(query)
-    ]);
+          },
+        ],
+      },
+    },
+  ]).allowDiskUse(true);
 
-    // Transform users to office format
-    const offices = users.map((user) => ({
-        _id: user._id.toString(),
-        name: user.name,
-        phoneNumber: user.phoneNumber,
-        avatar: user.avatar,
-        instagram: user.instagram,
-        tiktok: user.tiktok,
-        description: user.description,
-        adsCount: user.adsCount,
-        email: user.phoneNumber
-    }));
+  const offices = aggregation[0]?.offices || [];
+  const total = aggregation[0]?.metadata[0]?.total || 0;
 
-    return {
-        offices,
-        total,
-        page,
-        totalPages: Math.ceil(total / limit)
-    };
+  return {
+    offices,
+    total,
+    page,
+    totalPages: Math.ceil(total / limit),
+  };
 };
 
 /**

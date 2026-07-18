@@ -11,6 +11,7 @@
     "lint:fix": "eslint . --ext .js,.ts --fix",
     "format": "prettier --write .",
     "migrate:public-ids": "ts-node src/scripts/migrate-public-ids.ts",
+    "ensure:office-indexes": "ts-node src/scripts/ensure-office-indexes.ts",
     "retire:monthly-plans": "ts-node src/scripts/retire-monthly-plans.ts",
     "prepare": "husky"
   },
