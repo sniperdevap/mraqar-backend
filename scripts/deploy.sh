@@ -4,7 +4,7 @@ set -euo pipefail
 
 DIR="/var/www/mr-aqar-staging/aqar-backend"
 BRANCH="main"
-PM2_NAME=" mr-aqar-staging-backend"
+PM2_NAME="mr-aqar-staging-backend"
 
 log() { echo "[$(date '+%F %T')] $*"; }
 
@@ -20,8 +20,10 @@ log() { echo "[$(date '+%F %T')] $*"; }
   fi
 
   log "deploying $remote_rev"
-  git reset --hard "origin/$BRANCH"
-  npm ci && npm run build && pm2 restart "$PM2_NAME"
+  git reset --hard "origin/$BRANCH"          # pull latest
+  npm ci                                     # sync deps
+  npm run build                              # build
+  pm2 restart "$PM2_NAME" --update-env       # restart app
   log "deployed."
 } >> "$DIR/deploy.log" 2>&1
 
