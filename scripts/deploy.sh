@@ -2,10 +2,10 @@
 # Auto-deploy backend: pull latest main IF newest incoming commit is by zaheer-bashir.
 set -euo pipefail
 
-DIR="/var/www/mr-aqar/aqar-backend"
+DIR="/var/www/mr-aqar-staging/aqar-backend"
 BRANCH="main"
 AUTHOR_MATCH="zaheer-bashir"   # matches name or email, case-insensitive
-PM2_NAME="aqar-backend"
+PM2_NAME=" mr-aqar-staging-backend"
 
 log() { echo "[$(date '+%F %T')] $*"; }
 
