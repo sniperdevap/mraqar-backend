@@ -1,10 +1,9 @@
 #!/usr/bin/env bash
-# Auto-deploy backend: pull latest main IF newest incoming commit is by zaheer-bashir.
+# Auto-deploy backend: pull latest main whenever origin has new commits.
 set -euo pipefail
 
 DIR="/var/www/mr-aqar-staging/aqar-backend"
 BRANCH="main"
-AUTHOR_MATCH="zaheer-bashir"   # matches name or email, case-insensitive
 PM2_NAME=" mr-aqar-staging-backend"
 
 log() { echo "[$(date '+%F %T')] $*"; }
@@ -20,13 +19,7 @@ log() { echo "[$(date '+%F %T')] $*"; }
     exit 0
   fi
 
-  author=$(git log -1 --format='%an %ae' "origin/$BRANCH")
-  if ! echo "$author" | grep -qi "$AUTHOR_MATCH"; then
-    log "new commits but latest author '$author' is not $AUTHOR_MATCH — skipping."
-    exit 0
-  fi
-
-  log "deploying $remote_rev by $author"
+  log "deploying $remote_rev"
   git reset --hard "origin/$BRANCH"
   npm ci && npm run build && pm2 restart "$PM2_NAME"
   log "deployed."
