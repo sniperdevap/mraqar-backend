@@ -337,14 +337,16 @@ export interface CountAdViewResult {
 }
 
 /**
- * Records a single view per ad per IP (hashed, never stored raw) and
- * atomically increments the ad's view counter only the first time.
- * Repeat calls from the same IP for the same ad are deduped via the
- * unique `identifier` index on AdView and simply report the current count.
+ * Records a single view per ad per visitor (logged-in user id when known,
+ * otherwise hashed IP — never stored raw) and atomically increments the ad's
+ * view counter only the first time. Repeat calls from the same visitor are
+ * deduped via the unique `identifier` index on AdView and simply report the
+ * current count. The ad's own owner never counts.
  */
 export const countAdView = async (
   id: string,
   ip: string,
+  userId?: string,
 ): Promise<CountAdViewResult | null> => {
   let adObjectId: Types.ObjectId;
   try {
@@ -353,12 +355,16 @@ export const countAdView = async (
     return null;
   }
 
-  const ad = await AdModel.findById(adObjectId).select("views");
+  const ad = await AdModel.findById(adObjectId).select("views user");
   if (!ad) return null;
+
+  if (userId && ad.user?.toString() === userId) {
+    return { counted: false, views: ad.views ?? 0 };
+  }
 
   const identifier = crypto
     .createHash("sha256")
-    .update(`${ip}:${adObjectId.toString()}`)
+    .update(`${userId ? `user:${userId}` : `ip:${ip}`}:${adObjectId.toString()}`)
     .digest("hex");
 
   const result = await AdViewModel.updateOne(

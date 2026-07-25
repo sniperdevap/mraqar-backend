@@ -76,10 +76,11 @@ export const getAd = asyncHandler(async (req: Request, res: Response) => {
 
 export const countAdView = asyncHandler(async (req: Request, res: Response) => {
     const id = req.params.id as string;
+    const user = req.user as JwtPayload | undefined;
 
     const ip = req.ip || (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.socket.remoteAddress || 'unknown';
 
-    const result = await adService.countAdView(id, ip);
+    const result = await adService.countAdView(id, ip, user?.id);
     if (!result) {
         return res.status(404).json(formatResponse(false, 'Ad not found'));
     }
