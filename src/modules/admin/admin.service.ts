@@ -266,7 +266,8 @@ export const getAllUsersForAdmin = async (page: number = 1, limit: number = 10, 
     const skip = (page - 1) * limit;
 
     const matchStage: Record<string, unknown> = {
-        role: { $ne: 'super_admin' }
+        role: { $ne: 'super_admin' },
+        deletedAt: null,
     };
 
     if (status && status !== 'all') {
@@ -436,7 +437,10 @@ export const deleteUser = async (userId: string) => {
     user.deletedAt = new Date();
     await user.save();
 
-    await Promise.all([AdModel.updateMany({ user: userId }, { status: 'inactive' }), UserSubscriptionModel.updateMany({ user: userId }, { isActive: false })]);
+    await Promise.all([
+        AdModel.updateMany({ user: userId }, { status: 'inactive' }),
+        UserSubscriptionModel.updateMany({ user: userId }, { isActive: false }),
+    ]);
 
     return true;
 };
