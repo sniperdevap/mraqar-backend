@@ -195,6 +195,16 @@ export const getOfficeById = async (
         { $sort: { createdAt: -1 as const } },
         { $skip: adSkip },
         { $limit: adLimit },
+        {
+            $addFields: {
+                user: {
+                    _id: user._id,
+                    name: user.name,
+                    phoneNumber: user.phoneNumber,
+                    avatar: user.avatar
+                }
+            }
+        },
         // Populate propertyType
         {
             $lookup: {
