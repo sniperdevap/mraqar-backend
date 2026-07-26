@@ -123,6 +123,30 @@ export const updateAd = asyncHandler(async (req: Request, res: Response) => {
     res.status(200).json(formatResponse(true, 'Ad updated successfully', updatedAd));
 });
 
+export const repostAd = asyncHandler(async (req: Request, res: Response) => {
+    const user = req.user as JwtPayload;
+    const id = req.params.id as string;
+
+    const existingAd = await adService.getAdById(id);
+    if (!existingAd) {
+        return res.status(404).json(formatResponse(false, 'Ad not found'));
+    }
+
+    const adOwnerId = (existingAd.user as any)._id ? (existingAd.user as any)._id.toString() : existingAd.user.toString();
+
+    if (adOwnerId !== user.id && user.role !== 'super_admin') {
+        return res.status(403).json(formatResponse(false, 'Not authorized to repost this ad'));
+    }
+
+    // Credit always comes off the ad owner, even when a super admin triggers the repost.
+    const ad = await adService.repostAd(id, adOwnerId);
+    if (!ad) {
+        return res.status(404).json(formatResponse(false, 'Ad not found'));
+    }
+
+    res.status(200).json(formatResponse(true, 'Ad reposted successfully', ad));
+});
+
 export const deleteAd = asyncHandler(async (req: Request, res: Response) => {
     const user = req.user as JwtPayload;
     const id = req.params.id as string;

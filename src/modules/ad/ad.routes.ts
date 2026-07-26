@@ -12,6 +12,7 @@ router.get('/my-ads', authMiddleware, adController.getMyAds);
 router.get('/', optionalAuthMiddleware, adController.getAds);
 router.get('/:id', optionalAuthMiddleware, adController.getAd);
 router.post('/:id/view', optionalAuthMiddleware, adController.countAdView);
+router.post('/:id/repost', authMiddleware, adController.repostAd);
 router.put('/:id', authMiddleware, validateRequest(updateAdSchema), adController.updateAd);
 router.delete('/:id', authMiddleware, adController.deleteAd);
 

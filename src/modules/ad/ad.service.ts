@@ -615,6 +615,47 @@ export const updateAd = async (
   return await AdModel.findByIdAndUpdate(adObjectId, updates, { new: true });
 };
 
+export const repostAd = async (
+  id: string,
+  userId: string,
+): Promise<IAd | null> => {
+  const adObjectId = await resolveAdId(id);
+
+  const subscription = await UserSubscriptionModel.findOneAndUpdate(
+    {
+      user: userId,
+      planType: PlanType.OFFICE_PLAN,
+      isActive: true,
+      credits: { $gt: 0 },
+    },
+    { $inc: { credits: -1 } },
+  );
+
+  if (!subscription) {
+    throw new CustomError(
+      "You have no ad credits remaining. Please purchase a plan to continue reposting ads.",
+      400,
+      "INSUFFICIENT_CREDITS",
+    );
+  }
+
+  const now = new Date();
+  const { matchedCount } = await AdModel.collection.updateOne(
+    { _id: adObjectId },
+    { $set: { createdAt: now, updatedAt: now } },
+  );
+
+  if (!matchedCount) {
+    await UserSubscriptionModel.updateOne(
+      { _id: subscription._id },
+      { $inc: { credits: 1 } },
+    );
+    return null;
+  }
+
+  return AdModel.findById(adObjectId);
+};
+
 export const deleteAd = async (id: string): Promise<IAd | null> => {
   const adObjectId = await resolveAdId(id);
   const ad = await AdModel.findByIdAndDelete(adObjectId);
