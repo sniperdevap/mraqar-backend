@@ -17,6 +17,8 @@ import {
 export type AdDocument = Document<unknown, {}, IAd> &
   IAd & { _id: Types.ObjectId };
 
+export const REPOST_COOLDOWN_MS = 24 * 60 * 60 * 1000;
+
 export const createAd = async (adData: Partial<IAd>): Promise<AdDocument> => {
   // Normalize legacy field name.
   if (
@@ -364,7 +366,9 @@ export const countAdView = async (
 
   const identifier = crypto
     .createHash("sha256")
-    .update(`${userId ? `user:${userId}` : `ip:${ip}`}:${adObjectId.toString()}`)
+    .update(
+      `${userId ? `user:${userId}` : `ip:${ip}`}:${adObjectId.toString()}`,
+    )
     .digest("hex");
 
   const result = await AdViewModel.updateOne(
@@ -621,6 +625,21 @@ export const repostAd = async (
 ): Promise<IAd | null> => {
   const adObjectId = await resolveAdId(id);
 
+  const cutoff = new Date(Date.now() - REPOST_COOLDOWN_MS);
+  const existing = await AdModel.findById(adObjectId)
+    .select("createdAt")
+    .lean();
+
+  if (!existing) return null;
+
+  if (existing.createdAt > cutoff) {
+    throw new CustomError(
+      "This ad was already reposted in the last 24 hours. Please try again later.",
+      429,
+      "REPOST_COOLDOWN",
+    );
+  }
+
   const subscription = await UserSubscriptionModel.findOneAndUpdate(
     {
       user: userId,
@@ -641,7 +660,7 @@ export const repostAd = async (
 
   const now = new Date();
   const { matchedCount } = await AdModel.collection.updateOne(
-    { _id: adObjectId },
+    { _id: adObjectId, createdAt: { $lte: cutoff } },
     { $set: { createdAt: now, updatedAt: now } },
   );
 
@@ -650,7 +669,12 @@ export const repostAd = async (
       { _id: subscription._id },
       { $inc: { credits: 1 } },
     );
-    return null;
+    // The ad existed a moment ago, so a miss here means a concurrent repost won.
+    throw new CustomError(
+      "This ad was already reposted in the last 24 hours. Please try again later.",
+      429,
+      "REPOST_COOLDOWN",
+    );
   }
 
   return AdModel.findById(adObjectId);

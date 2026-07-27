@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { AdPurpose } from './models/ad.model';
+import { AdPriceUnit, AdPurpose } from './models/ad.model';
 
 export const createAdSchema = z.object({
     body: z
@@ -10,6 +10,7 @@ export const createAdSchema = z.object({
             propertyType: z.number({ required_error: 'Property type is required' }).int().positive(),
             area: z.number({ required_error: 'Area is required' }).int().positive(),
             price: z.number().min(0).optional().nullable(),
+            priceUnit: z.nativeEnum(AdPriceUnit).optional(),
             phoneNumber: z.string({ required_error: 'Phone number is required' }),
             isPhoneHidden: z.boolean().optional(),
             alternativePhoneNumber: z.string().optional(),
@@ -28,6 +29,7 @@ export const updateAdSchema = z.object({
             propertyType: z.number().int().positive().optional(),
             area: z.number().int().positive().optional(),
             price: z.number().min(0).optional().nullable(),
+            priceUnit: z.nativeEnum(AdPriceUnit).optional(),
             phoneNumber: z.string().optional(),
             isPhoneHidden: z.boolean().optional(),
             alternativePhoneNumber: z.string().optional(),

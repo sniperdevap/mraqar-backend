@@ -12,6 +12,11 @@ export enum AdStatus {
   SOLD = "sold",
 }
 
+export enum AdPriceUnit {
+  KD = "kd",
+  THOUSAND = "thousand",
+}
+
 export interface IAd extends Document {
   publicId: number;
   user: mongoose.Types.ObjectId;
@@ -20,6 +25,7 @@ export interface IAd extends Document {
   propertyType: mongoose.Types.ObjectId;
   area: mongoose.Types.ObjectId;
   price: number;
+  priceUnit: AdPriceUnit;
   phoneNumber: string;
   isPhoneHidden: boolean;
   alternativePhoneNumber?: string;
@@ -55,6 +61,11 @@ const AdSchema: Schema = new Schema(
     },
     area: { type: Schema.Types.ObjectId, ref: "Area", required: true },
     price: { type: Number, required: true },
+    priceUnit: {
+      type: String,
+      enum: Object.values(AdPriceUnit),
+      default: AdPriceUnit.KD,
+    },
     phoneNumber: { type: String, required: true },
     isPhoneHidden: { type: Boolean, default: false },
     alternativePhoneNumber: { type: String },
