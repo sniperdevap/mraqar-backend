@@ -1,6 +1,6 @@
 import mongoose, { Schema } from 'mongoose';
 
-export type CounterKey = 'ad' | 'area' | 'propertyType';
+export type CounterKey = 'ad' | 'area' | 'propertyType' | 'user';
 
 interface ICounter {
     _id: CounterKey;

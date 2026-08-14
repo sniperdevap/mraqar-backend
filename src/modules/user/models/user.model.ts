@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import { UserRole } from '../user.constants';
 
 interface User extends Document {
+    publicId: number;
     name: string;
     phoneNumber: string;
     password: string;
@@ -25,6 +26,7 @@ declare module 'mongoose' {
 
 const UserSchema: Schema = new Schema(
     {
+        publicId: { type: Number, required: true, immutable: true, unique: true, sparse: true, min: 1, index: true },
         name: { type: String, required: true },
         phoneNumber: { type: String, required: true, unique: true, index: true },
         password: {
@@ -45,6 +47,13 @@ const UserSchema: Schema = new Schema(
     },
     { timestamps: true }
 );
+
+UserSchema.pre('validate', async function () {
+    if (this.isNew && !this.publicId) {
+        const { nextPublicId } = await import('../../counter/counter.service');
+        this.publicId = await nextPublicId('user');
+    }
+});
 
 UserSchema.methods.matchPassword = async function (enteredPassword: string) {
     if (!enteredPassword || !this.password) {

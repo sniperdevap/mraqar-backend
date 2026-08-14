@@ -4,6 +4,7 @@ import config from '../config/default';
 import { AdModel } from '../modules/ad/models/ad.model';
 import { Area } from '../modules/metadata/models/area.model';
 import { PropertyType } from '../modules/metadata/models/property-type.model';
+import { UserModel } from '../modules/user/models';
 import { setCounterSequence } from '../modules/counter/counter.service';
 
 dotenv.config();
@@ -15,7 +16,7 @@ if (!Number.isSafeInteger(batchSize) || batchSize < 1) throw new Error('batch-si
 
 type MigratedModel = Model<any>;
 
-async function migrate(model: MigratedModel, name: string, counterKey: 'ad' | 'area' | 'propertyType') {
+async function migrate(model: MigratedModel, name: string, counterKey: 'ad' | 'area' | 'propertyType' | 'user') {
     const existing = await model
         .find({ publicId: { $type: 'number' } })
         .sort({ publicId: -1 })
@@ -53,6 +54,7 @@ async function migrate(model: MigratedModel, name: string, counterKey: 'ad' | 'a
 async function verify() {
     for (const [model, name] of [
         [AdModel, 'ads'],
+        [UserModel, 'users'],
         [Area, 'areas'],
         [PropertyType, 'property types']
     ] as const) {
@@ -77,6 +79,7 @@ async function main() {
     await migrate(PropertyType, 'property types', 'propertyType');
     await migrate(Area, 'areas', 'area');
     await migrate(AdModel, 'ads', 'ad');
+    await migrate(UserModel, 'users', 'user');
     await verify();
     console.log(apply ? 'Public ID migration completed.' : 'Dry run completed. Re-run with --apply to write changes.');
 }

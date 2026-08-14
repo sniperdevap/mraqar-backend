@@ -165,7 +165,7 @@ export const getAds = async (
         from: "users",
         localField: "user",
         foreignField: "_id",
-        pipeline: [{ $project: { name: 1, phoneNumber: 1, avatar: 1 } }],
+        pipeline: [{ $project: { publicId: 1, name: 1, phoneNumber: 1, avatar: 1 } }],
         as: "user",
       },
     },
@@ -322,7 +322,7 @@ export const getAds = async (
 export const getAdById = async (id: string): Promise<IAd | null> => {
   const objectId = await resolveAdId(id);
   const ad = await AdModel.findById(objectId)
-    .populate("user", "name phoneNumber avatar")
+    .populate("user", "publicId name phoneNumber avatar")
     .populate("propertyType", "publicId label labelAr value")
     .populate("area", "publicId label labelAr value governorateAr")
     .populate("media")
@@ -420,7 +420,7 @@ export const getAdByIdAggregated = async (
         from: "users",
         localField: "user",
         foreignField: "_id",
-        pipeline: [{ $project: { name: 1, phoneNumber: 1, avatar: 1 } }],
+        pipeline: [{ $project: { publicId: 1, name: 1, phoneNumber: 1, avatar: 1 } }],
         as: "user",
       },
     },
@@ -701,7 +701,7 @@ export const getMyAds = async (userId: string): Promise<IAd[]> => {
         from: "users",
         localField: "user",
         foreignField: "_id",
-        pipeline: [{ $project: { name: 1, phoneNumber: 1, avatar: 1 } }],
+        pipeline: [{ $project: { publicId: 1, name: 1, phoneNumber: 1, avatar: 1 } }],
         as: "user",
       },
     },

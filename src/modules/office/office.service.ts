@@ -24,6 +24,7 @@ export interface GetOfficesResult {
 
 export interface Office {
     _id: string;
+    publicId?: number;
     name: string;
     phoneNumber: string;
     avatar?: string;
@@ -96,6 +97,7 @@ export const getOffices = async (
           {
             $project: {
               _id: "$office._id",
+              publicId: "$office.publicId",
               name: "$office.name",
               phoneNumber: "$office.phoneNumber",
               avatar: "$office.avatar",
@@ -140,8 +142,14 @@ export const getOfficeById = async (
     },
     userId?: string
 ): Promise<{ office: Office | null; ads: any[]; totalAds: number; page: number; totalPages: number }> => {
-    // Get office (user) details
-    const user = await UserModel.findById(officeId).select('name phoneNumber avatar instagram tiktok description').lean();
+    const officeQuery =
+        mongoose.Types.ObjectId.isValid(officeId) && officeId.length === 24
+            ? { _id: new mongoose.Types.ObjectId(officeId) }
+            : { publicId: Number(officeId) };
+    const user =
+        'publicId' in officeQuery && !Number.isSafeInteger(officeQuery.publicId)
+            ? null
+            : await UserModel.findOne(officeQuery).select('publicId name phoneNumber avatar instagram tiktok description').lean();
 
     if (!user) {
         return {
@@ -159,7 +167,7 @@ export const getOfficeById = async (
 
     // Build match stage
     const matchStage: any = {
-        user: new mongoose.Types.ObjectId(officeId),
+        user: user._id,
         status: 'active'
     };
 
@@ -199,6 +207,7 @@ export const getOfficeById = async (
             $addFields: {
                 user: {
                     _id: user._id,
+                    publicId: user.publicId,
                     name: user.name,
                     phoneNumber: user.phoneNumber,
                     avatar: user.avatar
@@ -308,6 +317,7 @@ export const getOfficeById = async (
 
     const office: Office = {
         _id: user._id.toString(),
+        publicId: user.publicId,
         name: user.name,
         phoneNumber: user.phoneNumber,
         avatar: user.avatar,

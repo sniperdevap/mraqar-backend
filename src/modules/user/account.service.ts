@@ -83,7 +83,7 @@ export const getUserAds = async (userId: string, status?: string, page: number =
                 from: 'users',
                 localField: 'user',
                 foreignField: '_id',
-                pipeline: [{ $project: { name: 1, phoneNumber: 1, avatar: 1 } }],
+                pipeline: [{ $project: { publicId: 1, name: 1, phoneNumber: 1, avatar: 1 } }],
                 as: 'user'
             }
         },
@@ -335,7 +335,7 @@ export const getFavorites = async (userId: string, page: number = 1, limit: numb
                 from: 'users',
                 localField: 'user',
                 foreignField: '_id',
-                pipeline: [{ $project: { name: 1, phoneNumber: 1, avatar: 1 } }],
+                pipeline: [{ $project: { publicId: 1, name: 1, phoneNumber: 1, avatar: 1 } }],
                 as: 'user'
             }
         },
