@@ -20,9 +20,9 @@ const PropertyTypeSchema: Schema = new Schema(
 );
 
 PropertyTypeSchema.pre('validate', async function () {
-    if (this.isNew && !this.publicId) {
+    if (!this.publicId) {
         const { nextPublicId } = await import('../../counter/counter.service');
-        this.publicId = await nextPublicId('propertyType');
+        this.set('publicId', await nextPublicId('propertyType'), { overwriteImmutable: true });
     }
 });
 

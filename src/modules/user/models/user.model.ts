@@ -49,9 +49,9 @@ const UserSchema: Schema = new Schema(
 );
 
 UserSchema.pre('validate', async function () {
-    if (this.isNew && !this.publicId) {
+    if (!this.publicId) {
         const { nextPublicId } = await import('../../counter/counter.service');
-        this.publicId = await nextPublicId('user');
+        this.set('publicId', await nextPublicId('user'), { overwriteImmutable: true });
     }
 });
 

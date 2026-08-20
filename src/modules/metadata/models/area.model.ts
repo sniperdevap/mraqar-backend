@@ -24,9 +24,9 @@ const AreaSchema: Schema = new Schema(
 );
 
 AreaSchema.pre('validate', async function () {
-    if (this.isNew && !this.publicId) {
+    if (!this.publicId) {
         const { nextPublicId } = await import('../../counter/counter.service');
-        this.publicId = await nextPublicId('area');
+        this.set('publicId', await nextPublicId('area'), { overwriteImmutable: true });
     }
 });
 

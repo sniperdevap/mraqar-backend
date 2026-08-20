@@ -96,9 +96,9 @@ AdSchema.index({ user: 1, createdAt: -1 });
 AdSchema.index({ user: 1, status: 1, createdAt: -1 });
 
 AdSchema.pre("validate", async function () {
-  if (this.isNew && !this.publicId) {
+  if (!this.publicId) {
     const { nextPublicId } = await import("../../counter/counter.service");
-    this.publicId = await nextPublicId("ad");
+    this.set("publicId", await nextPublicId("ad"), { overwriteImmutable: true });
   }
 });
 
