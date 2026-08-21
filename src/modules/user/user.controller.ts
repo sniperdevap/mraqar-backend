@@ -26,7 +26,6 @@ const signup = async (req: Request, res: Response) => {
     isActive: true,
   });
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { password: _, __v, ...userWithoutSensitiveData } = newUser.toObject();
   res
     .status(201)
@@ -58,7 +57,6 @@ const getUserById = async (req: Request, res: Response) => {
     throw new CustomError(ERROR_MESSAGES.USER_ID_NOT_FOUND(id as string), 404);
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { password, __v, ...userWithoutSensitiveData } = user.toObject();
   res
     .status(200)
@@ -75,7 +73,6 @@ const createUser = async (req: Request, res: Response) => {
   const { ...userData } = req.body;
   const newUser = await UserService.createUser({ ...userData });
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { password, __v, ...userWithoutSensitiveData } = newUser.toObject();
   res
     .status(201)
@@ -103,7 +100,6 @@ const updateUser = async (req: Request, res: Response) => {
     throw new CustomError(ERROR_MESSAGES.USER_ID_NOT_FOUND(id as string), 404);
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { password, __v, ...userWithoutSensitiveData } = updatedUser.toObject();
   res
     .status(200)
@@ -151,7 +147,6 @@ const signin = async (req: Request, res: Response) => {
     (user._id as any).toString(),
   );
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { password: _, __v, ...userWithoutSensitiveData } = user.toObject();
 
   res.status(200).json(
@@ -219,7 +214,7 @@ const verifyOTP = async (req: Request, res: Response) => {
   const subscriptions = await getUserSubscriptions(
     (user._id as any).toString(),
   );
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+
   const { password: _, __v, ...userWithoutSensitiveData } = user.toObject();
 
   res.status(200).json(
@@ -244,7 +239,7 @@ const resendOTP = async (req: Request, res: Response) => {
   logger.info(`OTP generated for resend: ${phoneNumber}`);
   const smsSent = await sendSMS(
     phoneNumber,
-    `Your verification code is: ${otp}`,
+    `رمز التحقق الخاص بك في موقع مستر عقار الإلكتروني. ${otp}`,
   );
   if (!smsSent) {
     throw new CustomError("Failed to send verification code", 500);
