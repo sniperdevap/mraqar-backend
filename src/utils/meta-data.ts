@@ -465,6 +465,14 @@ export const AREAS = [
         governorateAr: 'محافظة العاصمة'
     },
     {
+        _id: '698be3b95f2ecb26d6e644d7',
+        label: 'Dasman',
+        labelAr: 'دسمان',
+        value: 'dasman',
+        governorate: 'Al-Asimah Governorate',
+        governorateAr: 'محافظة العاصمة'
+    },
+    {
         _id: '698be3b9e3d5c5a368593d9a',
         label: 'Mubarakiyah',
         labelAr: 'المباركية',
