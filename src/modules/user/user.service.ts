@@ -1,5 +1,4 @@
 import jwt, { JwtPayload } from 'jsonwebtoken';
-import type { StringValue } from 'ms';
 
 import CustomError from '../../utils/custom-error';
 import config from '../../config/default';
@@ -92,10 +91,10 @@ const generateResetToken = async (phoneNumber: string): Promise<string> => {
     return jwt.sign({ id: user.id }, config.jwtSecret!, { expiresIn: '15m' });
 };
 
-const generateAuthToken = (user: User, expiryTime: StringValue = '15m'): string => {
+const generateAuthToken = (user: User): string => {
     const payload: { id: string; role?: string } = { id: String(user._id) };
     if (user.role) payload.role = user.role;
-    return jwt.sign(payload, config.jwtSecret!, { expiresIn: expiryTime });
+    return jwt.sign(payload, config.jwtSecret!);
 };
 
 // Verify reset password token

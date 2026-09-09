@@ -142,7 +142,7 @@ const signin = async (req: Request, res: Response) => {
   if (!user.isActive) {
     throw new CustomError(ERROR_MESSAGES.ACCOUNT_INACTIVE, 403);
   }
-  const token = await UserService.generateAuthToken(user, "7d");
+  const token = await UserService.generateAuthToken(user);
   const subscriptions = await getUserSubscriptions(
     (user._id as any).toString(),
   );
@@ -210,7 +210,7 @@ const verifyOTP = async (req: Request, res: Response) => {
   user.isVerified = true;
   await user.save();
 
-  const authToken = await UserService.generateAuthToken(user, "7d");
+  const authToken = await UserService.generateAuthToken(user);
   const subscriptions = await getUserSubscriptions(
     (user._id as any).toString(),
   );
