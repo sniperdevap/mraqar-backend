@@ -13,7 +13,9 @@
     "migrate:public-ids": "ts-node src/scripts/migrate-public-ids.ts",
     "ensure:office-indexes": "ts-node src/scripts/ensure-office-indexes.ts",
     "retire:monthly-plans": "ts-node src/scripts/retire-monthly-plans.ts",
-    "prepare": "husky"
+    "prepare": "husky",
+    "test:knet": "ts-node src/scripts/knet-e2e.ts",
+    "test:knet:auth": "bash scripts/knet-auth-check.sh"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.975.0",

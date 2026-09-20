@@ -15,11 +15,22 @@ agenda.define('send daily summary email', () => {
     logger.info('Agenda job: send daily summary email');
 });
 
+agenda.define('reconcile pending payments', async () => {
+    if (!process.env.KNET_BASE_URL) return;
+
+    const { reconcilePendingPayments } = await import('../modules/payment/payment.service');
+    const checked = await reconcilePendingPayments();
+    if (checked > 0) {
+        logger.info(`[knet] reconcile swept ${checked} pending payment(s)`);
+    }
+});
+
 export async function setupAgendaJobs() {
     await agenda.start();
     await agenda.every('5 minutes', 'log heartbeat');
     await agenda.every('0 0 * * *', 'send daily summary email'); // At midnight every day
     await agenda.every('1 hour', 'expire premium ads'); // Check every hour for expired premium ads
+    await agenda.every('5 minutes', 'reconcile pending payments');
 }
 
 // Export agenda for custom job registration

@@ -19,7 +19,8 @@ const seedSubscriptionPlan = async (): Promise<void> => {
         ];
 
         for (const plan of plans) {
-            await SubscriptionPlanModel.findOneAndUpdate({ planType: plan.planType }, { $set: plan }, { upsert: true, new: true });
+            const { price, ...rest } = plan;
+            await SubscriptionPlanModel.findOneAndUpdate({ planType: plan.planType }, { $set: rest, $setOnInsert: { price } }, { upsert: true, new: true });
         }
         await SubscriptionPlanModel.updateMany({ planType: PlanType.MONTH_PLAN }, { $set: { isActive: false } });
 

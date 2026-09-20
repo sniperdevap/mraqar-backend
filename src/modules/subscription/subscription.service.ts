@@ -1,4 +1,4 @@
-import { SubscriptionPlanModel, PlanType } from '../subscription-plan/models/subscription-plan.model';
+import { SubscriptionPlanModel, PlanType, ISubscriptionPlan } from '../subscription-plan/models/subscription-plan.model';
 import { UserSubscriptionModel } from './models/user-subscription.model';
 import { NotificationModel, NotificationType } from '../user/models/notification.model';
 import { CouponModel } from '../coupon/models/coupon.model';
@@ -15,18 +15,41 @@ const getPlanCredits = (plan: { adCredits?: number }) => {
     return (legacyPlan.normalAds || 0) + (legacyPlan.premiumAds || 0);
 };
 
-export const subscribeUser = async (userId: string, planId: string, couponCode?: string, lang: string = 'en') => {
+export const priceOrder = async (planId: string, couponCode?: string) => {
     const plan = await SubscriptionPlanModel.findOne({ _id: planId, planType: PlanType.OFFICE_PLAN, isActive: true });
     if (!plan) {
         throw new Error('Plan not found');
     }
 
-    // Handle coupon if provided
+    let discountValue = 0;
     if (couponCode) {
-        await couponService.validateCoupon(couponCode);
-        // Increment usage count
-        await CouponModel.updateOne({ code: couponCode.toUpperCase() }, { $inc: { usageCount: 1 } });
+        ({ discountValue } = await couponService.validateCoupon(couponCode));
     }
+
+    const amount = Math.round(plan.price * (1 - discountValue / 100) * 1000) / 1000;
+
+    return { plan, amount, discountValue, couponCode };
+};
+
+export const consumeCoupon = async (couponCode?: string) => {
+    if (!couponCode) return;
+    await CouponModel.updateOne({ code: couponCode.toUpperCase() }, { $inc: { usageCount: 1 } });
+};
+
+export const assertPlanPurchasable = async (userId: string, plan: ISubscriptionPlan, lang: string = 'en') => {
+    const existing = await UserSubscriptionModel.findOne({ user: userId, planType: plan.planType });
+    if (!existing) return;
+
+    if ((existing.purchaseCount || 0) >= MAX_STANDARD_PURCHASES_PER_PLAN && (existing.credits || 0) > 0) {
+        if (lang === 'ar') {
+            throw new Error('يمكنك إعادة شراء هذه الخطة بعد استهلاك كامل الرصيد الحالي.');
+        }
+        throw new Error('You have reached the maximum purchase limit for this plan');
+    }
+};
+
+export const grantPlan = async (userId: string, plan: ISubscriptionPlan, lang: string = 'en') => {
+    await assertPlanPurchasable(userId, plan, lang);
 
     // Check if subscription exists for this plan type
     const existingSubscription = await UserSubscriptionModel.findOne({
@@ -41,16 +64,7 @@ export const subscribeUser = async (userId: string, planId: string, couponCode?:
     endDate.setMonth(endDate.getMonth() + durationMonths);
 
     if (existingSubscription) {
-        const currentPurchaseCount = existingSubscription.purchaseCount || 0;
-        const isOverStandardLimit = currentPurchaseCount >= MAX_STANDARD_PURCHASES_PER_PLAN;
-        if (isOverStandardLimit) {
-            // New cycle is allowed only after this plan's credits are fully consumed.
-            if ((existingSubscription.credits || 0) > 0) {
-                if (lang === 'ar') {
-                    throw new Error('يمكنك إعادة شراء هذه الخطة بعد استهلاك كامل الرصيد الحالي.');
-                }
-                throw new Error('You have reached the maximum purchase limit for this plan');
-            }
+        if ((existingSubscription.purchaseCount || 0) >= MAX_STANDARD_PURCHASES_PER_PLAN) {
             existingSubscription.purchaseCount = 0;
         }
         const creditsToAdd = getPlanCredits(plan);
@@ -105,6 +119,20 @@ export const subscribeUser = async (userId: string, planId: string, couponCode?:
     });
 
     return subscription;
+};
+
+export const subscribeUser = async (userId: string, planId: string, couponCode?: string, lang: string = 'en') => {
+    const order = await priceOrder(planId, couponCode);
+
+    if (order.amount > 0) {
+        if (lang === 'ar') {
+            throw new Error('هذه الخطة تتطلب الدفع. يرجى إتمام عملية الدفع.');
+        }
+        throw new Error('This plan requires payment. Please complete checkout.');
+    }
+
+    await consumeCoupon(couponCode);
+    return grantPlan(userId, order.plan, lang);
 };
 
 export const getUserSubscriptions = async (userId: string) => {
