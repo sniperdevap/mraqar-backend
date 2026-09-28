@@ -10,9 +10,20 @@ const seedSubscriptionPlan = async (): Promise<void> => {
                 nameAr: 'خطة المكتب',
                 planType: PlanType.OFFICE_PLAN,
                 description: 'إعلان - 1 شهور',
-                price: 0,
+                price: 30,
                 numberOfMonths: 1,
-                adCredits: 50,
+                adCredits: 30,
+                discount: 0,
+                isActive: true
+            },
+            {
+                name: 'Daily Plan',
+                nameAr: 'الخطة اليومية',
+                planType: PlanType.DAILY_PLAN,
+                description: 'إعلان مميز - رصيد واحد',
+                price: 1.5,
+                numberOfMonths: 1,
+                adCredits: 1,
                 discount: 0,
                 isActive: true
             }
@@ -22,7 +33,6 @@ const seedSubscriptionPlan = async (): Promise<void> => {
             const { price, ...rest } = plan;
             await SubscriptionPlanModel.findOneAndUpdate({ planType: plan.planType }, { $set: rest, $setOnInsert: { price } }, { upsert: true, new: true });
         }
-        await SubscriptionPlanModel.updateMany({ planType: PlanType.MONTH_PLAN }, { $set: { isActive: false } });
 
         logger.info('Subscription plans seeded/updated successfully.');
     } catch (error: unknown) {

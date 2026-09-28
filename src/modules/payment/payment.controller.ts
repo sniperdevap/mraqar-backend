@@ -6,7 +6,7 @@ import logger from '../../utils/logger';
 import config from '../../config/default';
 
 export const createCheckout = asyncHandler(async (req: Request, res: Response) => {
-    const { planId, coupon, mobile } = req.body;
+    const { planId, coupon, quantity } = req.body;
     const user = req.user as any;
     const lang = req.headers['accept-language']?.includes('ar') ? 'ar' : 'en';
 
@@ -15,34 +15,21 @@ export const createCheckout = asyncHandler(async (req: Request, res: Response) =
     }
 
     try {
-        const checkout = await paymentService.createCheckout({
-            userId: user.id,
-            planId,
-            couponCode: coupon,
-            lang,
-            mobile: mobile || user.phone
-        });
-
-        if (checkout.free) {
-            return res.status(200).json(formatResponse(true, 'Subscribed successfully', checkout));
-        }
-
-        res.status(200).json(formatResponse(true, 'Checkout created', checkout));
+        const checkout = await paymentService.createCheckout({ userId: user.id, planId, quantity: quantity === undefined ? 1 : Number(quantity), couponCode: coupon, lang });
+        res.status(200).json(formatResponse(true, checkout.free ? 'Subscribed successfully' : 'Checkout created', checkout));
     } catch (error: any) {
-        res.status(400).json(formatResponse(false, error.message));
+        res.status(error.statusCode || 400).json(formatResponse(false, error.message));
     }
 });
 
 export const callback = asyncHandler(async (req: Request, res: Response) => {
-    const query = { ...req.query, ...req.body } as { encrp?: string; ErrorCode?: string; PayTrackID?: string };
-
-    logger.info(`[knet] callback ${req.method} track=${query.PayTrackID || '-'} ErrorCode=${query.ErrorCode || '-'} encrp=${query.encrp ? 'yes' : 'no'}`);
+    const paymentId = typeof req.query.paymentId === 'string' ? req.query.paymentId : undefined;
+    logger.info(`[myfatoorah] callback paymentId=${paymentId || '-'}`);
 
     try {
-        const redirectUrl = await paymentService.handleCallback(query);
-        res.redirect(redirectUrl);
+        res.redirect(await paymentService.handleCallback(paymentId));
     } catch (error) {
-        logger.error(`[knet] callback failed: ${error instanceof Error ? error.message : 'unknown error'}`);
+        logger.error(`[myfatoorah] callback failed: ${error instanceof Error ? error.message : 'unknown error'}`);
         res.redirect(`${config.clientUrl}/payment/result?status=failed`);
     }
 });

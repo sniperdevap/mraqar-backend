@@ -16,12 +16,12 @@ agenda.define('send daily summary email', () => {
 });
 
 agenda.define('reconcile pending payments', async () => {
-    if (!process.env.KNET_BASE_URL) return;
+    if (!process.env.MYFATOORAH_API_KEY) return;
 
     const { reconcilePendingPayments } = await import('../modules/payment/payment.service');
     const checked = await reconcilePendingPayments();
     if (checked > 0) {
-        logger.info(`[knet] reconcile swept ${checked} pending payment(s)`);
+        logger.info(`[myfatoorah] reconcile swept ${checked} pending payment(s)`);
     }
 });
 

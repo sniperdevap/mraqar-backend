@@ -5,7 +5,7 @@ import { AdViewModel } from "./models/ad-view.model";
 import * as mediaService from "../media/media.service";
 import { MediaModel } from "../media/models/media.model";
 import { UserSubscriptionModel } from "../subscription/models/user-subscription.model";
-import { PlanType } from "../subscription-plan/models/subscription-plan.model";
+import { PlanType, SELLABLE_PLAN_TYPES } from "../subscription-plan/models/subscription-plan.model";
 import CustomError from "../../utils/custom-error";
 import {
   resolveAdId,
@@ -30,7 +30,7 @@ export const createAd = async (adData: Partial<IAd>): Promise<AdDocument> => {
 
   const subscriptions = await UserSubscriptionModel.find({
     user: adData.user,
-    planType: PlanType.OFFICE_PLAN,
+    planType: { $in: SELLABLE_PLAN_TYPES },
     isActive: true,
     credits: { $gt: 0 },
   });
@@ -43,10 +43,9 @@ export const createAd = async (adData: Partial<IAd>): Promise<AdDocument> => {
     );
   }
 
-  const officeSubscription = subscriptions.find(
-    (sub) => sub.planType === PlanType.OFFICE_PLAN,
-  );
-  const selectedSubscription = officeSubscription;
+  const selectedSubscription =
+    subscriptions.find((sub) => sub.planType === PlanType.OFFICE_PLAN) ??
+    subscriptions[0];
 
   if (!selectedSubscription) {
     throw new CustomError(
@@ -643,11 +642,12 @@ export const repostAd = async (
   const subscription = await UserSubscriptionModel.findOneAndUpdate(
     {
       user: userId,
-      planType: PlanType.OFFICE_PLAN,
+      planType: { $in: SELLABLE_PLAN_TYPES },
       isActive: true,
       credits: { $gt: 0 },
     },
     { $inc: { credits: -1 } },
+    { sort: { planType: -1 } },
   );
 
   if (!subscription) {

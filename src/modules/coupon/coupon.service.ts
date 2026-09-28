@@ -67,8 +67,6 @@ export const updateCoupon = async (
     const coupon = await CouponModel.findById(id);
     if (!coupon) throw new CustomError('Coupon not found', 404);
 
-    // If code is being changed, check unique and update stripe?
-    // Normally stripe coupons are immutable except for metadata.
     // Let's restrict code changes for simplicity and reliability.
     if (data.code && data.code.toUpperCase() !== coupon.code) {
         throw new CustomError('Coupon code cannot be changed. Delete and recreate if needed.', 400);

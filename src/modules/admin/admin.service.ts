@@ -2,7 +2,7 @@ import CustomError from '../../utils/custom-error';
 import { UserModel } from '../user/models';
 import { AdModel } from '../ad/models/ad.model';
 import { UserSubscriptionModel } from '../subscription/models/user-subscription.model';
-import { PlanType, SubscriptionPlanModel } from '../subscription-plan/models/subscription-plan.model';
+import { PlanType, SELLABLE_PLAN_TYPES, SubscriptionPlanModel } from '../subscription-plan/models/subscription-plan.model';
 import { Types, PipelineStage } from 'mongoose';
 import * as FailedAdService from '../failed-ad/failed-ad.service';
 import * as mediaService from '../media/media.service';
@@ -605,17 +605,15 @@ export const deleteFailedAdForAdmin = async (id: string) => {
 
 // Subscription Plans for Admin
 export const getAllSubscriptionPlansForAdmin = async () => {
-    return await SubscriptionPlanModel.find({ planType: PlanType.OFFICE_PLAN }).sort({ price: 1 });
+    return await SubscriptionPlanModel.find({ planType: { $in: SELLABLE_PLAN_TYPES } }).sort({ planType: 1 });
 };
 
 export const updateSubscriptionPlanForAdmin = async (id: string, data: Partial<any>) => {
     if (!Types.ObjectId.isValid(id)) {
         throw new Error('Invalid plan ID');
     }
-    if (data.planType && data.planType !== PlanType.OFFICE_PLAN) {
-        throw new Error('Only office plans are supported');
-    }
-    const plan = await SubscriptionPlanModel.findOneAndUpdate({ _id: id, planType: PlanType.OFFICE_PLAN }, { ...data, planType: PlanType.OFFICE_PLAN }, { new: true });
+    const { planType: _planType, ...updates } = data;
+    const plan = await SubscriptionPlanModel.findOneAndUpdate({ _id: id, planType: { $in: SELLABLE_PLAN_TYPES } }, updates, { new: true });
     if (!plan) {
         throw new Error('Plan not found');
     }
@@ -626,7 +624,7 @@ export const toggleSubscriptionPlanStatus = async (id: string) => {
     if (!Types.ObjectId.isValid(id)) {
         throw new Error('Invalid plan ID');
     }
-    const plan = await SubscriptionPlanModel.findOne({ _id: id, planType: PlanType.OFFICE_PLAN });
+    const plan = await SubscriptionPlanModel.findOne({ _id: id, planType: { $in: SELLABLE_PLAN_TYPES } });
     if (!plan) {
         throw new Error('Plan not found');
     }

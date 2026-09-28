@@ -10,9 +10,11 @@ export enum PaymentStatus {
 
 export interface IPayment extends Document {
     trackId: string;
+    invoiceId?: string;
     user: mongoose.Types.ObjectId;
     plan: mongoose.Types.ObjectId;
     planType: PlanType;
+    quantity: number;
     amount: number;
     couponCode?: string;
     status: PaymentStatus;
@@ -33,9 +35,11 @@ export interface IPayment extends Document {
 const PaymentSchema: Schema = new Schema(
     {
         trackId: { type: String, required: true, unique: true },
+        invoiceId: { type: String },
         user: { type: Schema.Types.ObjectId, ref: 'User', required: true },
         plan: { type: Schema.Types.ObjectId, ref: 'SubscriptionPlan', required: true },
         planType: { type: String, enum: Object.values(PlanType), required: true },
+        quantity: { type: Number, default: 1, min: 1 },
         amount: { type: Number, required: true, min: 0 },
         couponCode: { type: String },
         status: { type: String, enum: Object.values(PaymentStatus), default: PaymentStatus.PENDING },
