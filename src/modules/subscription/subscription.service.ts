@@ -1,10 +1,8 @@
-import { SubscriptionPlanModel, PlanType, ISubscriptionPlan } from '../subscription-plan/models/subscription-plan.model';
+import { SubscriptionPlanModel, PlanType, ISubscriptionPlan, SELLABLE_PLAN_TYPES } from '../subscription-plan/models/subscription-plan.model';
 import { UserSubscriptionModel } from './models/user-subscription.model';
 import { NotificationModel, NotificationType } from '../user/models/notification.model';
 import { CouponModel } from '../coupon/models/coupon.model';
 import * as couponService from '../coupon/coupon.service';
-
-const MAX_STANDARD_PURCHASES_PER_PLAN = 4;
 
 const getPlanCredits = (plan: { adCredits?: number }) => {
     if (typeof plan.adCredits === 'number') {
@@ -15,10 +13,17 @@ const getPlanCredits = (plan: { adCredits?: number }) => {
     return (legacyPlan.normalAds || 0) + (legacyPlan.premiumAds || 0);
 };
 
-export const priceOrder = async (planId: string, couponCode?: string) => {
-    const plan = await SubscriptionPlanModel.findOne({ _id: planId, planType: PlanType.OFFICE_PLAN, isActive: true });
+export const MAX_DAILY_CREDITS = 100;
+
+export const priceOrder = async (planId: string, couponCode?: string, quantity = 1) => {
+    const plan = await SubscriptionPlanModel.findOne({ _id: planId, planType: { $in: SELLABLE_PLAN_TYPES }, isActive: true });
     if (!plan) {
         throw new Error('Plan not found');
+    }
+
+    if (plan.planType !== PlanType.DAILY_PLAN) quantity = 1;
+    if (!Number.isInteger(quantity) || quantity < 1 || quantity > MAX_DAILY_CREDITS) {
+        throw new Error(`Quantity must be between 1 and ${MAX_DAILY_CREDITS}`);
     }
 
     let discountValue = 0;
@@ -26,9 +31,9 @@ export const priceOrder = async (planId: string, couponCode?: string) => {
         ({ discountValue } = await couponService.validateCoupon(couponCode));
     }
 
-    const amount = Math.round(plan.price * (1 - discountValue / 100) * 1000) / 1000;
+    const amount = Math.round(plan.price * quantity * (1 - discountValue / 100) * 1000) / 1000;
 
-    return { plan, amount, discountValue, couponCode };
+    return { plan, amount, discountValue, couponCode, quantity };
 };
 
 export const consumeCoupon = async (couponCode?: string) => {
@@ -36,21 +41,7 @@ export const consumeCoupon = async (couponCode?: string) => {
     await CouponModel.updateOne({ code: couponCode.toUpperCase() }, { $inc: { usageCount: 1 } });
 };
 
-export const assertPlanPurchasable = async (userId: string, plan: ISubscriptionPlan, lang: string = 'en') => {
-    const existing = await UserSubscriptionModel.findOne({ user: userId, planType: plan.planType });
-    if (!existing) return;
-
-    if ((existing.purchaseCount || 0) >= MAX_STANDARD_PURCHASES_PER_PLAN && (existing.credits || 0) > 0) {
-        if (lang === 'ar') {
-            throw new Error('يمكنك إعادة شراء هذه الخطة بعد استهلاك كامل الرصيد الحالي.');
-        }
-        throw new Error('You have reached the maximum purchase limit for this plan');
-    }
-};
-
-export const grantPlan = async (userId: string, plan: ISubscriptionPlan, lang: string = 'en') => {
-    await assertPlanPurchasable(userId, plan, lang);
-
+export const grantPlan = async (userId: string, plan: ISubscriptionPlan, quantity = 1) => {
     // Check if subscription exists for this plan type
     const existingSubscription = await UserSubscriptionModel.findOne({
         user: userId,
@@ -64,10 +55,7 @@ export const grantPlan = async (userId: string, plan: ISubscriptionPlan, lang: s
     endDate.setMonth(endDate.getMonth() + durationMonths);
 
     if (existingSubscription) {
-        if ((existingSubscription.purchaseCount || 0) >= MAX_STANDARD_PURCHASES_PER_PLAN) {
-            existingSubscription.purchaseCount = 0;
-        }
-        const creditsToAdd = getPlanCredits(plan);
+        const creditsToAdd = getPlanCredits(plan) * quantity;
         existingSubscription.credits = (existingSubscription.credits || 0) + creditsToAdd;
         existingSubscription.premiumCredits = 0;
         existingSubscription.purchaseCount = (existingSubscription.purchaseCount || 0) + 1;
@@ -82,7 +70,7 @@ export const grantPlan = async (userId: string, plan: ISubscriptionPlan, lang: s
             user: userId,
             plan: plan._id,
             planType: plan.planType,
-            credits: getPlanCredits(plan),
+            credits: getPlanCredits(plan) * quantity,
             premiumCredits: 0,
             startDate: now,
             endDate: endDate,
@@ -121,8 +109,8 @@ export const grantPlan = async (userId: string, plan: ISubscriptionPlan, lang: s
     return subscription;
 };
 
-export const subscribeUser = async (userId: string, planId: string, couponCode?: string, lang: string = 'en') => {
-    const order = await priceOrder(planId, couponCode);
+export const subscribeUser = async (userId: string, planId: string, couponCode?: string, lang: string = 'en', quantity = 1) => {
+    const order = await priceOrder(planId, couponCode, quantity);
 
     if (order.amount > 0) {
         if (lang === 'ar') {
@@ -132,20 +120,21 @@ export const subscribeUser = async (userId: string, planId: string, couponCode?:
     }
 
     await consumeCoupon(couponCode);
-    return grantPlan(userId, order.plan, lang);
+    return grantPlan(userId, order.plan, order.quantity);
 };
 
 export const getUserSubscriptions = async (userId: string) => {
     // Populate plan details for display names etc if needed
     return await UserSubscriptionModel.find({
         user: userId,
-        planType: PlanType.OFFICE_PLAN,
+        planType: { $in: SELLABLE_PLAN_TYPES },
         $or: [{ isActive: true }, { credits: { $gt: 0 } }]
     }).populate('plan');
 };
 
 export interface RemainingAdCredits {
     officeCredits: number;
+    dailyCredits: number;
     totalCredits: number;
 }
 
@@ -153,14 +142,17 @@ export const getRemainingAdCredits = async (userId: string): Promise<RemainingAd
     const activeSubscriptions = await UserSubscriptionModel.find({
         user: userId,
         credits: { $gt: 0 },
-        planType: PlanType.OFFICE_PLAN,
+        planType: { $in: SELLABLE_PLAN_TYPES },
         isActive: true
     }).select('planType credits');
 
-    const officeCredits = activeSubscriptions.filter((sub) => sub.planType === PlanType.OFFICE_PLAN).reduce((sum, sub) => sum + (sub.credits || 0), 0);
+    const sum = (type: PlanType) => activeSubscriptions.filter((sub) => sub.planType === type).reduce((total, sub) => total + (sub.credits || 0), 0);
+    const officeCredits = sum(PlanType.OFFICE_PLAN);
+    const dailyCredits = sum(PlanType.DAILY_PLAN);
 
     return {
         officeCredits,
-        totalCredits: officeCredits
+        dailyCredits,
+        totalCredits: officeCredits + dailyCredits
     };
 };

@@ -11,9 +11,7 @@ import contactRouter from '../modules/contact/contact.routes';
 import adminRouter from '../modules/admin/admin.routes';
 import couponRouter from '../modules/coupon/coupon.routes';
 import paymentRouter from '../modules/payment/payment.routes';
-import mockKnetRouter, { isMockGatewayEnabled } from '../modules/payment/knet.mock';
 import config from '../config/default';
-import logger from '../utils/logger';
 
 const registerRoutes = (app: Express) => {
     // Route to Ping & check if Server is online
@@ -33,11 +31,6 @@ const registerRoutes = (app: Express) => {
     app.use(`${config.baseRoute}/admin`, adminRouter);
     app.use(`${config.baseRoute}/coupons`, couponRouter);
     app.use(`${config.baseRoute}/payments`, paymentRouter);
-
-    if (isMockGatewayEnabled()) {
-        app.use('/mock-knet', mockKnetRouter);
-        logger.warn('[knet:mock] FAKE PAYMENT GATEWAY MOUNTED at /mock-knet - payments are simulated');
-    }
 };
 
 export default registerRoutes;

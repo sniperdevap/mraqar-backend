@@ -12,10 +12,8 @@
     "format": "prettier --write .",
     "migrate:public-ids": "ts-node src/scripts/migrate-public-ids.ts",
     "ensure:office-indexes": "ts-node src/scripts/ensure-office-indexes.ts",
-    "retire:monthly-plans": "ts-node src/scripts/retire-monthly-plans.ts",
     "prepare": "husky",
-    "test:knet": "ts-node src/scripts/knet-e2e.ts",
-    "test:knet:auth": "bash scripts/knet-auth-check.sh"
+    "check:payment": "ts-node src/modules/payment/payment.check.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.975.0",
@@ -39,7 +37,6 @@
     "mongoose": "^8.13.2",
     "multer": "^1.4.5-lts.2",
     "nodemailer": "^8.0.1",
-    "stripe": "^20.1.0",
     "uuid": "^11.1.0",
     "winston": "^3.17.0",
     "winston-daily-rotate-file": "^5.0.0",

@@ -1,9 +1,11 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
 export enum PlanType {
-    MONTH_PLAN = 'month-plan',
-    OFFICE_PLAN = 'office-plan'
+    OFFICE_PLAN = 'office-plan',
+    DAILY_PLAN = 'daily-plan'
 }
+
+export const SELLABLE_PLAN_TYPES = [PlanType.OFFICE_PLAN, PlanType.DAILY_PLAN];
 
 export interface ISubscriptionPlan extends Document {
     name: string;
