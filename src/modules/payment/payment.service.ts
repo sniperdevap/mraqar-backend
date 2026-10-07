@@ -27,7 +27,7 @@ export const createCheckout = async (params: CreateCheckoutParams) => {
 
     if (amount <= 0) {
         await subscriptionService.consumeCoupon(couponCode);
-        const subscription = await subscriptionService.grantPlan(params.userId, plan, quantity);
+        const subscription = await subscriptionService.grantPlan(params.userId, plan, quantity, params.lang);
         return { free: true as const, subscription };
     }
 
