@@ -5,7 +5,7 @@ import { AdViewModel } from "./models/ad-view.model";
 import * as mediaService from "../media/media.service";
 import { MediaModel } from "../media/models/media.model";
 import { UserSubscriptionModel } from "../subscription/models/user-subscription.model";
-import { PlanType, SELLABLE_PLAN_TYPES } from "../subscription-plan/models/subscription-plan.model";
+import { ALL_PLAN_TYPES, PlanType, SELLABLE_PLAN_TYPES } from "../subscription-plan/models/subscription-plan.model";
 import CustomError from "../../utils/custom-error";
 import {
   resolveAdId,
@@ -28,14 +28,38 @@ export const createAd = async (adData: Partial<IAd>): Promise<AdDocument> => {
     adData.premiumAd = adData.isPremium;
   }
 
+  // premiumAd true/false restricts the charge to premium or normal credits; left unset,
+  // premium credits are used first and normal ones after.
+  const premium = typeof adData.premiumAd === "boolean" ? adData.premiumAd : undefined;
+  const planTypes =
+    premium === true
+      ? SELLABLE_PLAN_TYPES
+      : premium === false
+        ? [PlanType.NORMAL_PLAN]
+        : ALL_PLAN_TYPES;
+
   const subscriptions = await UserSubscriptionModel.find({
     user: adData.user,
-    planType: { $in: SELLABLE_PLAN_TYPES },
+    planType: { $in: planTypes },
     isActive: true,
     credits: { $gt: 0 },
   });
 
-  if (!subscriptions || subscriptions.length === 0) {
+  if (subscriptions.length === 0) {
+    if (premium === true) {
+      throw new CustomError(
+        "You dont have premium ad credits left. Please buy a plan or post a normal ad.",
+        400,
+        "NO_PREMIUM_CREDITS",
+      );
+    }
+    if (premium === false) {
+      throw new CustomError(
+        "You dont have normal ads left. Please get the free normal plan again or post a premium ad.",
+        400,
+        "NO_NORMAL_CREDITS",
+      );
+    }
     throw new CustomError(
       "You dont have a subscription. Please subscribe first to create ads.",
       400,
@@ -45,17 +69,11 @@ export const createAd = async (adData: Partial<IAd>): Promise<AdDocument> => {
 
   const selectedSubscription =
     subscriptions.find((sub) => sub.planType === PlanType.OFFICE_PLAN) ??
-    subscriptions[0];
+    subscriptions.find((sub) => sub.planType === PlanType.DAILY_PLAN) ??
+    subscriptions[0]!;
 
-  if (!selectedSubscription) {
-    throw new CustomError(
-      "You have no ad credits remaining. Please purchase a plan to continue posting ads.",
-      400,
-      "INSUFFICIENT_CREDITS",
-    );
-  }
-
-  adData.premiumAd = true;
+  // The credit that pays for the ad decides its type, never the raw request flag.
+  adData.premiumAd = SELLABLE_PLAN_TYPES.includes(selectedSubscription.planType);
   adData.premiumExpiresAt = undefined;
 
   const resolvedAdData = await resolveMetadataInput(adData as Partial<IAd>);
@@ -626,7 +644,7 @@ export const repostAd = async (
 
   const cutoff = new Date(Date.now() - REPOST_COOLDOWN_MS);
   const existing = await AdModel.findById(adObjectId)
-    .select("createdAt")
+    .select("createdAt premiumAd")
     .lean();
 
   if (!existing) return null;
@@ -642,7 +660,10 @@ export const repostAd = async (
   const subscription = await UserSubscriptionModel.findOneAndUpdate(
     {
       user: userId,
-      planType: { $in: SELLABLE_PLAN_TYPES },
+      // A repost spends the same kind of credit the ad was posted with.
+      planType: {
+        $in: existing.premiumAd !== false ? SELLABLE_PLAN_TYPES : [PlanType.NORMAL_PLAN],
+      },
       isActive: true,
       credits: { $gt: 0 },
     },

@@ -2,10 +2,13 @@ import mongoose, { Schema, Document } from 'mongoose';
 
 export enum PlanType {
     OFFICE_PLAN = 'office-plan',
-    DAILY_PLAN = 'daily-plan'
+    DAILY_PLAN = 'daily-plan',
+    NORMAL_PLAN = 'normal-plan'
 }
 
+// Paid plans; their credits post premium ads. The normal plan is a free grant of normal ads.
 export const SELLABLE_PLAN_TYPES = [PlanType.OFFICE_PLAN, PlanType.DAILY_PLAN];
+export const ALL_PLAN_TYPES = Object.values(PlanType);
 
 export interface ISubscriptionPlan extends Document {
     name: string;

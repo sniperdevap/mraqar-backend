@@ -1,4 +1,4 @@
-import { SubscriptionPlanModel, PlanType, ISubscriptionPlan, SELLABLE_PLAN_TYPES } from '../subscription-plan/models/subscription-plan.model';
+import { SubscriptionPlanModel, PlanType, ISubscriptionPlan, ALL_PLAN_TYPES } from '../subscription-plan/models/subscription-plan.model';
 import { UserSubscriptionModel } from './models/user-subscription.model';
 import { NotificationModel, NotificationType } from '../user/models/notification.model';
 import { CouponModel } from '../coupon/models/coupon.model';
@@ -16,7 +16,7 @@ const getPlanCredits = (plan: { adCredits?: number }) => {
 export const MAX_DAILY_CREDITS = 100;
 
 export const priceOrder = async (planId: string, couponCode?: string, quantity = 1) => {
-    const plan = await SubscriptionPlanModel.findOne({ _id: planId, planType: { $in: SELLABLE_PLAN_TYPES }, isActive: true });
+    const plan = await SubscriptionPlanModel.findOne({ _id: planId, planType: { $in: ALL_PLAN_TYPES }, isActive: true });
     if (!plan) {
         throw new Error('Plan not found');
     }
@@ -24,6 +24,11 @@ export const priceOrder = async (planId: string, couponCode?: string, quantity =
     if (plan.planType !== PlanType.DAILY_PLAN) quantity = 1;
     if (!Number.isInteger(quantity) || quantity < 1 || quantity > MAX_DAILY_CREDITS) {
         throw new Error(`Quantity must be between 1 and ${MAX_DAILY_CREDITS}`);
+    }
+
+    // The normal plan is always a single free grant, whatever price, coupon or quantity is sent.
+    if (plan.planType === PlanType.NORMAL_PLAN) {
+        return { plan, amount: 0, discountValue: 0, couponCode: undefined, quantity: 1 };
     }
 
     let discountValue = 0;
@@ -41,12 +46,17 @@ export const consumeCoupon = async (couponCode?: string) => {
     await CouponModel.updateOne({ code: couponCode.toUpperCase() }, { $inc: { usageCount: 1 } });
 };
 
-export const grantPlan = async (userId: string, plan: ISubscriptionPlan, quantity = 1) => {
+export const grantPlan = async (userId: string, plan: ISubscriptionPlan, quantity = 1, lang: string = 'en') => {
     // Check if subscription exists for this plan type
     const existingSubscription = await UserSubscriptionModel.findOne({
         user: userId,
         planType: plan.planType
     });
+
+    // Free normal ads can only be claimed again once the previous batch is used up.
+    if (plan.planType === PlanType.NORMAL_PLAN && (existingSubscription?.credits || 0) > 0) {
+        throw new Error(lang === 'ar' ? 'لا يزال لديك إعلانات عادية متبقية. يمكنك الحصول على المزيد بعد استخدامها.' : 'You still have normal ads left. You can claim more once they are used up.');
+    }
 
     let subscription;
     const now = new Date();
@@ -120,14 +130,14 @@ export const subscribeUser = async (userId: string, planId: string, couponCode?:
     }
 
     await consumeCoupon(couponCode);
-    return grantPlan(userId, order.plan, order.quantity);
+    return grantPlan(userId, order.plan, order.quantity, lang);
 };
 
 export const getUserSubscriptions = async (userId: string) => {
     // Populate plan details for display names etc if needed
     return await UserSubscriptionModel.find({
         user: userId,
-        planType: { $in: SELLABLE_PLAN_TYPES },
+        planType: { $in: ALL_PLAN_TYPES },
         $or: [{ isActive: true }, { credits: { $gt: 0 } }]
     }).populate('plan');
 };
@@ -135,6 +145,8 @@ export const getUserSubscriptions = async (userId: string) => {
 export interface RemainingAdCredits {
     officeCredits: number;
     dailyCredits: number;
+    normalCredits: number;
+    premiumCredits: number;
     totalCredits: number;
 }
 
@@ -142,17 +154,21 @@ export const getRemainingAdCredits = async (userId: string): Promise<RemainingAd
     const activeSubscriptions = await UserSubscriptionModel.find({
         user: userId,
         credits: { $gt: 0 },
-        planType: { $in: SELLABLE_PLAN_TYPES },
+        planType: { $in: ALL_PLAN_TYPES },
         isActive: true
     }).select('planType credits');
 
     const sum = (type: PlanType) => activeSubscriptions.filter((sub) => sub.planType === type).reduce((total, sub) => total + (sub.credits || 0), 0);
     const officeCredits = sum(PlanType.OFFICE_PLAN);
     const dailyCredits = sum(PlanType.DAILY_PLAN);
+    const normalCredits = sum(PlanType.NORMAL_PLAN);
+    const premiumCredits = officeCredits + dailyCredits;
 
     return {
         officeCredits,
         dailyCredits,
-        totalCredits: officeCredits + dailyCredits
+        normalCredits,
+        premiumCredits,
+        totalCredits: premiumCredits + normalCredits
     };
 };
