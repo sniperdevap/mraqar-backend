@@ -1,5 +1,5 @@
 {
-  "name": "Mr aqar",
+  "name": "mr-aqar-backend",
   "version": "1.0.0",
   "author": "Ropstam",
   "main": "dist/index.js",
@@ -28,7 +28,6 @@
     "dotenv": "^16.4.7",
     "ejs": "^3.1.10",
     "express": "^5.2.1",
-    "express-boilerplate": "file:",
     "express-rate-limit": "^6.11.2",
     "ffmpeg-static": "^5.3.0",
     "fluent-ffmpeg": "^2.1.3",

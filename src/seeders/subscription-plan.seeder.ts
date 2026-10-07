@@ -9,8 +9,8 @@ const seedSubscriptionPlan = async (): Promise<void> => {
                 name: 'Office plan',
                 nameAr: 'خطة المكتب',
                 planType: PlanType.OFFICE_PLAN,
-                description: 'إعلان - 1 شهور',
-                price: 30,
+                description: 'مكتب - 1 شهر',
+                price: 25,
                 numberOfMonths: 1,
                 adCredits: 30,
                 discount: 0,
@@ -20,10 +20,21 @@ const seedSubscriptionPlan = async (): Promise<void> => {
                 name: 'Daily Plan',
                 nameAr: 'الخطة اليومية',
                 planType: PlanType.DAILY_PLAN,
-                description: 'إعلان مميز - رصيد واحد',
+                description: 'شراء أرصدة للإعلانات',
                 price: 1.5,
                 numberOfMonths: 1,
                 adCredits: 1,
+                discount: 0,
+                isActive: true
+            },
+            {
+                name: 'Normal Ads',
+                nameAr: 'إعلانات عادية',
+                planType: PlanType.NORMAL_PLAN,
+                description: 'Post up to 10 normal ads for free.',
+                price: 0,
+                numberOfMonths: 1,
+                adCredits: 10,
                 discount: 0,
                 isActive: true
             }

@@ -119,6 +119,12 @@ export const updateAd = asyncHandler(async (req: Request, res: Response) => {
         req.body.user = req.query.userId as string;
     }
 
+    // An ad's type is set by the credit it was paid with, so owners can't upgrade it by editing.
+    if (user.role !== 'super_admin') {
+        delete req.body.premiumAd;
+        delete req.body.isPremium;
+    }
+
     const updatedAd = await adService.updateAd(id, req.body);
     res.status(200).json(formatResponse(true, 'Ad updated successfully', updatedAd));
 });
