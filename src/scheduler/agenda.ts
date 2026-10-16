@@ -15,6 +15,12 @@ agenda.define('send daily summary email', () => {
     logger.info('Agenda job: send daily summary email');
 });
 
+agenda.define('expire premium ads', async () => {
+    const { expirePremiumAds } = await import('../modules/ad/ad.service');
+    const n = await expirePremiumAds();
+    if (n > 0) logger.info(`[premium] ${n} ad(s) finished their 14-day featured period`);
+});
+
 agenda.define('reconcile pending payments', async () => {
     if (!process.env.MYFATOORAH_API_KEY) return;
 
@@ -29,7 +35,7 @@ export async function setupAgendaJobs() {
     await agenda.start();
     await agenda.every('5 minutes', 'log heartbeat');
     await agenda.every('0 0 * * *', 'send daily summary email'); // At midnight every day
-    await agenda.every('1 hour', 'expire premium ads'); // Check every hour for expired premium ads
+    await agenda.every('10 minutes', 'expire premium ads'); // Premium lasts 14 days, then the ad becomes normal
     await agenda.every('5 minutes', 'reconcile pending payments');
 }
 

@@ -74,7 +74,7 @@ export const createAd = async (adData: Partial<IAd>): Promise<AdDocument> => {
 
   // The credit that pays for the ad decides its type, never the raw request flag.
   adData.premiumAd = SELLABLE_PLAN_TYPES.includes(selectedSubscription.planType);
-  adData.premiumExpiresAt = undefined;
+  adData.premiumExpiresAt = adData.premiumAd ? premiumUntil() : undefined;
 
   const resolvedAdData = await resolveMetadataInput(adData as Partial<IAd>);
   const ad = await AdModel.create(resolvedAdData);
@@ -84,6 +84,31 @@ export const createAd = async (adData: Partial<IAd>): Promise<AdDocument> => {
   await selectedSubscription.save();
 
   return ad as AdDocument;
+};
+
+/** Premium ads are featured (badge + top of the list) for 14 days. */
+export const PREMIUM_DAYS = Number(process.env.PREMIUM_DAYS || 14);
+export const premiumUntil = (from = new Date()) => new Date(from.getTime() + PREMIUM_DAYS * 24 * 60 * 60 * 1000);
+
+/**
+ * Ends the featured period: premium ads past premiumExpiresAt (or, for ads made
+ * before expiry dates existed, older than 14 days) become normal ads, so they lose
+ * the badge and drop out of the premium-first ordering.
+ */
+export const expirePremiumAds = async (now = new Date()) => {
+  const legacyCutoff = new Date(now.getTime() - PREMIUM_DAYS * 24 * 60 * 60 * 1000);
+  const { modifiedCount } = await AdModel.collection.updateMany(
+    {
+      premiumAd: true,
+      $or: [
+        { premiumExpiresAt: { $lte: now } },
+        { premiumExpiresAt: { $exists: false }, createdAt: { $lte: legacyCutoff } },
+        { premiumExpiresAt: null, createdAt: { $lte: legacyCutoff } },
+      ],
+    },
+    { $set: { premiumAd: false }, $unset: { premiumExpiresAt: "" } },
+  );
+  return modifiedCount;
 };
 
 export interface GetAdsParams {
@@ -631,7 +656,10 @@ export const updateAd = async (
     }
   }
 
-  updates.premiumExpiresAt = undefined;
+  // Admin turning premium on starts a fresh 14-day window; turning it off clears it.
+  if (updates.premiumAd === true) updates.premiumExpiresAt = premiumUntil();
+  else if (updates.premiumAd === false) updates.premiumExpiresAt = undefined;
+  else delete updates.premiumExpiresAt;
 
   return await AdModel.findByIdAndUpdate(adObjectId, updates, { new: true });
 };
@@ -682,7 +710,16 @@ export const repostAd = async (
   const now = new Date();
   const { matchedCount } = await AdModel.collection.updateOne(
     { _id: adObjectId, createdAt: { $lte: cutoff } },
-    { $set: { createdAt: now, updatedAt: now } },
+    {
+      $set: {
+        createdAt: now,
+        updatedAt: now,
+        // Reposting with a premium credit features the ad again for another 14 days.
+        ...(SELLABLE_PLAN_TYPES.includes(subscription.planType)
+          ? { premiumAd: true, premiumExpiresAt: premiumUntil(now) }
+          : { premiumAd: false }),
+      },
+    },
   );
 
   if (!matchedCount) {
