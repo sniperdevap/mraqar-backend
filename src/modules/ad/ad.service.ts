@@ -98,6 +98,8 @@ export interface GetAdsParams {
   status?: string | string[];
   premiumAd?: boolean;
   isPremium?: boolean;
+  /** Free-text search over the ad description. */
+  search?: string;
 }
 
 export interface GetAdsResult {
@@ -121,6 +123,7 @@ export const getAds = async (
     status,
     premiumAd,
     isPremium,
+    search,
   } = params;
 
   const filter: any = {};
@@ -165,6 +168,12 @@ export const getAds = async (
     if (maxPrice !== undefined) {
       filter.price.$lte = maxPrice;
     }
+  }
+
+  const text = (search || "").trim().slice(0, 60);
+  if (text) {
+    const escaped = text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    filter.description = { $regex: escaped, $options: "i" };
   }
 
   const skip = (page - 1) * limit;

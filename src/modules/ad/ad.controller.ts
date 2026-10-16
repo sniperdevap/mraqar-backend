@@ -30,7 +30,7 @@ export const createAd = asyncHandler(async (req: Request, res: Response) => {
 });
 
 export const getAds = asyncHandler(async (req: Request, res: Response) => {
-    const { page, limit, purpose, propertyType, area, minPrice, maxPrice } = req.query;
+    const { page, limit, purpose, propertyType, area, minPrice, maxPrice, search } = req.query;
     // User is optional - route is public but can have optional auth
     const user = req.user as JwtPayload | undefined;
 
@@ -56,6 +56,7 @@ export const getAds = asyncHandler(async (req: Request, res: Response) => {
         area: areaParam,
         minPrice: minPrice ? parseFloat(minPrice as string) : undefined,
         maxPrice: maxPrice ? parseFloat(maxPrice as string) : undefined,
+        search: typeof search === "string" ? search : undefined,
         userId: user?.id
     };
 
