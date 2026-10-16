@@ -15,6 +15,11 @@ interface User extends Document {
     instagram?: string;
     tiktok?: string;
     description?: string;
+    email?: string;
+    googleId?: string;
+    accountType?: 'individual' | 'office';
+    userType?: 'personal' | 'owner' | 'marketer';
+    licenseNumber?: string;
 }
 
 // Add instance method for password comparison
@@ -43,7 +48,12 @@ const UserSchema: Schema = new Schema(
         avatar: { type: String },
         instagram: { type: String },
         tiktok: { type: String },
-        description: { type: String }
+        description: { type: String },
+        email: { type: String, lowercase: true, trim: true, unique: true, sparse: true },
+        googleId: { type: String, unique: true, sparse: true },
+        accountType: { type: String, enum: ['individual', 'office'], default: 'individual' },
+        userType: { type: String, enum: ['personal', 'owner', 'marketer'] },
+        licenseNumber: { type: String, trim: true }
     },
     { timestamps: true }
 );

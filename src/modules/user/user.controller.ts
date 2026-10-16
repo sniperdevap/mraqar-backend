@@ -8,12 +8,78 @@ import { JwtPayload } from "jsonwebtoken";
 import logger from "../../utils/logger";
 import { getUserSubscriptions } from "../subscription/subscription.service";
 import { sendSMS } from "../../utils/sms-sender";
+import { UserModel } from "./models/user.model";
+import crypto from "crypto";
+
+/** Verifies a Google Identity Services ID token and returns its profile. */
+const verifyGoogleCredential = async (credential: string) => {
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  if (!clientId) throw new CustomError("Google sign-in is not configured", 503);
+  const r = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`);
+  if (!r.ok) throw new CustomError("Invalid Google sign-in", 401);
+  const info = (await r.json()) as { aud?: string; sub?: string; email?: string; email_verified?: string | boolean; name?: string; picture?: string; exp?: string };
+  const verified = info.email_verified === true || info.email_verified === "true";
+  if (info.aud !== clientId || !info.sub || !info.email || !verified) throw new CustomError("Invalid Google sign-in", 401);
+  return { googleId: info.sub, email: info.email.toLowerCase(), name: info.name || "", picture: info.picture };
+};
+
+const authPayload = async (user: any) => {
+  const token = await UserService.generateAuthToken(user);
+  const subscriptions = await getUserSubscriptions((user._id as any).toString());
+  const { password: _, __v, ...rest } = user.toObject();
+  return { token, user: { ...rest, subscriptions } };
+};
+
+/**
+ * POST /users/google { credential, phoneNumber?, name?, accountType?, userType?, licenseNumber? }
+ * Signs in an existing account (matched by Google id or email). A new account needs a
+ * Kuwait phone number, so the first call answers { needsPhone: true } and the client
+ * calls again with the phone number.
+ */
+const googleSignin = async (req: Request, res: Response) => {
+  const { credential, phoneNumber, name, accountType, userType, licenseNumber } = req.body;
+  const g = await verifyGoogleCredential(credential);
+
+  let user: any = await UserModel.findOne({ $or: [{ googleId: g.googleId }, { email: g.email }] });
+  if (user) {
+    if (!user.isActive) throw new CustomError(ERROR_MESSAGES.ACCOUNT_INACTIVE, 403);
+    if (!user.googleId) { user.googleId = g.googleId; await user.save(); }
+    return res.status(200).json(formatResponse(true, SUCCESS_MESSAGES.SIGNIN_SUCCESSFUL, await authPayload(user)));
+  }
+
+  if (!phoneNumber) {
+    return res.status(200).json(formatResponse(true, "Phone number required", { needsPhone: true, email: g.email, name: g.name }));
+  }
+  if (accountType === "office" && !licenseNumber) throw new CustomError("License number is required for offices", 400);
+  if (await UserService.getUserByPhoneNumber(String(phoneNumber).trim())) {
+    throw new CustomError(ERROR_MESSAGES.USER_ALREADY_EXISTS, 400);
+  }
+  user = await UserService.createUser({
+    name: (name || g.name || g.email.split("@")[0]).trim(),
+    phoneNumber: String(phoneNumber).trim(),
+    password: crypto.randomBytes(24).toString("hex"),
+    avatar: g.picture,
+    email: g.email,
+    googleId: g.googleId,
+    accountType: accountType || "individual",
+    userType: accountType === "office" ? undefined : userType,
+    licenseNumber: accountType === "office" ? licenseNumber : undefined,
+    role: UserRole.USER,
+    isVerified: true,
+    isActive: true,
+  } as any);
+  res.status(201).json(formatResponse(true, SUCCESS_MESSAGES.USER_CREATED, await authPayload(user)));
+};
 const signup = async (req: Request, res: Response) => {
-  const { name, phoneNumber, password, avatar } = req.body;
+  const { name, phoneNumber, password, avatar, email, accountType, userType, licenseNumber } = req.body;
 
   const existingUser = await UserService.getUserByPhoneNumber(phoneNumber);
   if (existingUser) {
     throw new CustomError(ERROR_MESSAGES.USER_ALREADY_EXISTS, 400);
+  }
+  const cleanEmail = typeof email === "string" && email.trim() ? email.trim().toLowerCase() : undefined;
+  if (cleanEmail && (await UserModel.exists({ email: cleanEmail }))) {
+    throw new CustomError("Email is already registered", 400);
   }
 
   const newUser = await UserService.createUser({
@@ -21,6 +87,10 @@ const signup = async (req: Request, res: Response) => {
     phoneNumber: phoneNumber.trim(),
     password,
     avatar,
+    email: cleanEmail,
+    accountType: accountType || "individual",
+    userType: accountType === "office" ? undefined : userType,
+    licenseNumber: accountType === "office" ? licenseNumber : undefined,
     role: UserRole.USER,
     isVerified: true,
     isActive: true,
@@ -317,6 +387,7 @@ export {
   forgotPassword,
   resetPassword,
   signup,
+  googleSignin,
   verifyOTP,
   resendOTP,
   verifyResetToken,

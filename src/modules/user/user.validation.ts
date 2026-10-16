@@ -91,7 +91,24 @@ const businessOwnerSignupSchema = z.object({
         name: z.string().min(1, 'Name is required').trim(),
         phoneNumber: z.string().min(1, 'Phone number is required'),
         password: passwordSchema,
-        avatar: z.string().min(1, 'Profile photo is required')
+        avatar: z.string().optional(),
+        email: z.string().email('Invalid email address').optional().or(z.literal('')),
+        accountType: z.enum(['individual', 'office']).optional(),
+        userType: z.enum(['personal', 'owner', 'marketer']).optional(),
+        licenseNumber: z.string().trim().optional()
+    }).refine((b) => b.accountType !== 'office' || Boolean(b.licenseNumber), {
+        message: 'License number is required for offices', path: ['licenseNumber']
+    })
+});
+
+const googleSigninSchema = z.object({
+    body: z.object({
+        credential: z.string().min(20, 'Google credential is required'),
+        phoneNumber: z.string().optional(),
+        name: z.string().trim().optional(),
+        accountType: z.enum(['individual', 'office']).optional(),
+        userType: z.enum(['personal', 'owner', 'marketer']).optional(),
+        licenseNumber: z.string().trim().optional()
     })
 });
 
@@ -128,6 +145,7 @@ export {
     resendOTPSchema,
     updateAccountSchema,
     businessOwnerSignupSchema,
+    googleSigninSchema,
     verifyResetTokenSchema,
     getAllBusinessesSchema,
     toggleUserStatusSchema,

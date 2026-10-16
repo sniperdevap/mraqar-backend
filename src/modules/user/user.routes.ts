@@ -11,6 +11,7 @@ import {
     verifyOTP,
     resendOTP,
     signup,
+    googleSignin,
     verifyResetToken,
     getAllBusinesses,
     getBusinessStats,
@@ -29,6 +30,7 @@ import {
     verifyOTPSchema,
     resendOTPSchema,
     businessOwnerSignupSchema,
+    googleSigninSchema,
     verifyResetTokenSchema,
     getAllBusinessesSchema,
     toggleUserStatusSchema
@@ -41,6 +43,7 @@ const router = Router();
 //public routes
 router.post('/signin', validateRequest(signinSchema), asyncHandler(signin));
 router.post('/signup', validateRequest(businessOwnerSignupSchema), asyncHandler(signup));
+router.post('/google', validateRequest(googleSigninSchema), asyncHandler(googleSignin));
 router.post('/forgot-password', validateRequest(forgotPasswordSchema), asyncHandler(forgotPassword));
 router.get('/verify-reset-token', validateRequest(verifyResetTokenSchema), asyncHandler(verifyResetToken));
 router.post('/reset-password', validateRequest(resetPasswordSchema), asyncHandler(resetPassword));
