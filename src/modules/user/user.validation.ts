@@ -54,10 +54,13 @@ const signinSchema = z.object({
     })
 });
 
+// Phone number or email: the reset code goes by SMS or by email.
+const phoneOrEmail = {
+    phoneNumber: z.string().min(1).optional(),
+    email: z.string().email('Invalid email address').optional()
+};
 const forgotPasswordSchema = z.object({
-    body: z.object({
-        phoneNumber: z.string().min(1, 'Phone number is required')
-    })
+    body: z.object(phoneOrEmail).refine((b) => b.phoneNumber || b.email, { message: 'Phone number or email is required' })
 });
 
 const resetPasswordSchema = z.object({
@@ -68,16 +71,12 @@ const resetPasswordSchema = z.object({
 });
 
 const verifyOTPSchema = z.object({
-    body: z.object({
-        phoneNumber: z.string().min(1, 'Phone number is required'),
-        code: z.string().min(1, 'Verification code is required')
-    })
+    body: z.object({ ...phoneOrEmail, code: z.string().min(1, 'Verification code is required') })
+        .refine((b) => b.phoneNumber || b.email, { message: 'Phone number or email is required' })
 });
 
 const resendOTPSchema = z.object({
-    body: z.object({
-        phoneNumber: z.string().min(1, 'Phone number is required')
-    })
+    body: z.object(phoneOrEmail).refine((b) => b.phoneNumber || b.email, { message: 'Phone number or email is required' })
 });
 
 const verifyResetTokenSchema = z.object({

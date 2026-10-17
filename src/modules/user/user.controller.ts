@@ -8,6 +8,7 @@ import { JwtPayload } from "jsonwebtoken";
 import logger from "../../utils/logger";
 import { getUserSubscriptions } from "../subscription/subscription.service";
 import { sendSMS } from "../../utils/sms-sender";
+import { sendEmail } from "../../utils/email-sender";
 import { UserModel } from "./models/user.model";
 import crypto from "crypto";
 
@@ -227,14 +228,29 @@ const signin = async (req: Request, res: Response) => {
   );
 };
 
+/** Finds the account by phone number or by email (whichever the user typed). */
+const findByPhoneOrEmail = async (phoneNumber?: string, email?: string) => {
+  if (phoneNumber) return UserService.getUserByPhoneNumber(phoneNumber);
+  if (email) return UserModel.findOne({ email: String(email).trim().toLowerCase() });
+  return null;
+};
+
+const sendResetCodeByEmail = async (to: string, otp: string) =>
+  sendEmail(to, "رمز إعادة تعيين كلمة المرور - مستر عقار", "reset-code", { otp });
+
 const forgotPassword = async (req: Request, res: Response) => {
-  const { phoneNumber } = req.body;
-  const user = await UserService.getUserByPhoneNumber(phoneNumber);
+  const { phoneNumber, email } = req.body;
+  const user = await findByPhoneOrEmail(phoneNumber, email);
   if (!user) {
     throw new CustomError(ERROR_MESSAGES.USER_NOT_FOUND, 404);
   }
 
   const otp = await UserService.generateOTP((user._id as any).toString());
+  if (!phoneNumber && email) {
+    logger.info(`OTP generated for forgot-password by email: ${user._id}`);
+    if (!(await sendResetCodeByEmail((user as any).email, otp))) throw new CustomError("Failed to send reset code", 500);
+    return res.status(200).json(formatResponse(true, "Reset code sent to your email"));
+  }
   logger.info(`OTP generated for forgot-password: ${phoneNumber}`);
   const smsSent = await sendSMS(
     phoneNumber,
@@ -262,9 +278,9 @@ const resetPassword = async (req: Request, res: Response) => {
 };
 
 const verifyOTP = async (req: Request, res: Response) => {
-  const { phoneNumber, code } = req.body;
+  const { phoneNumber, email, code } = req.body;
 
-  const user = await UserService.getUserByPhoneNumber(phoneNumber);
+  const user: any = await findByPhoneOrEmail(phoneNumber, email);
   if (!user) {
     throw new CustomError(ERROR_MESSAGES.USER_NOT_FOUND, 404);
   }
@@ -277,8 +293,11 @@ const verifyOTP = async (req: Request, res: Response) => {
     throw new CustomError("Invalid or expired verification code", 400);
   }
 
-  user.isVerified = true;
-  await user.save();
+  // A code sent by SMS proves the phone number; one sent by email doesn't.
+  if (phoneNumber) {
+    user.isVerified = true;
+    await user.save();
+  }
 
   const authToken = await UserService.generateAuthToken(user);
   const subscriptions = await getUserSubscriptions(
@@ -296,8 +315,8 @@ const verifyOTP = async (req: Request, res: Response) => {
 };
 
 const resendOTP = async (req: Request, res: Response) => {
-  const { phoneNumber } = req.body;
-  const user = await UserService.getUserByPhoneNumber(phoneNumber);
+  const { phoneNumber, email } = req.body;
+  const user: any = await findByPhoneOrEmail(phoneNumber, email);
   if (!user) {
     throw new CustomError(ERROR_MESSAGES.USER_NOT_FOUND, 404);
   }
@@ -306,7 +325,11 @@ const resendOTP = async (req: Request, res: Response) => {
   }
 
   const otp = await UserService.generateOTP((user._id as any).toString());
-  logger.info(`OTP generated for resend: ${phoneNumber}`);
+  logger.info(`OTP generated for resend: ${phoneNumber || user._id}`);
+  if (!phoneNumber && email) {
+    if (!(await sendResetCodeByEmail(user.email, otp))) throw new CustomError("Failed to send verification code", 500);
+    return res.status(200).json(formatResponse(true, "Verification code resent"));
+  }
   const smsSent = await sendSMS(
     phoneNumber,
     `رمز التحقق الخاص بك في موقع مستر عقار الإلكتروني. ${otp}`,
